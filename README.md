@@ -1,6 +1,6 @@
 # Virtual Dungeon Master (VDM)
 
-![Virtual Dungeon Master Logo](https://i.imgur.com/qGDHTpk.png)
+<center><img src="https://i.imgur.com/qGDHTpk.png" alt="Virtual Dungeon Master Logo"></center>
 
 A Python-based application designed to act as a virtual dungeon master for tabletop role-playing games, facilitating freeform storytelling for up to 8 players primarily through voice interaction.
 

@@ -1,0 +1,1 @@
+# gamestate_manager.py - Manages the game state and transitions between different states using serialized JSON data.

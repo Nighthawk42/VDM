@@ -1,0 +1,1 @@
+# llm_manager.py - This module manages the large language model (LLM) functionality provided by LM Studio.

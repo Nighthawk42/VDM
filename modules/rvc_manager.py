@@ -1,0 +1,1 @@
+# rvc_manager.py - This module manages the real-time voice conversion (RVC) functionality provided by RVC to be used in conjunction with the TTS engine.

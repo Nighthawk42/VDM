@@ -1,0 +1,1 @@
+# stt_manager.py - This module manages the speech-to-text (STT) functionality provided by faster-whisper.

@@ -1,0 +1,3 @@
+# ui.py - This is a module that handles the user interface for the game, including displaying messages and managing user input. It will likely use PyGame or a similar library to create a faux console for user interaction.
+
+# We could use the general OS console, but this is more robust at the cost of being more complex to implement. It also allows for more advanced features like mouse input, which we may want to use in the future.

@@ -1,0 +1,1 @@
+# server.py - This module manages the server functionality, including the API and WebRTC connections.

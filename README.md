@@ -1,6 +1,8 @@
 # Virtual Dungeon Master (VDM)
 
-A Python-based application designed to act as a virtual dungeon master for tabletop role-playing games, facilitating freeform storytelling for up to 8 players primarily through voice interaction. Developed by Nighthawk42.
+![Virtual Dungeon Master Logo](https://i.imgur.com/Kv4rIog.png)
+
+A Python-based application designed to act as a virtual dungeon master for tabletop role-playing games, facilitating freeform storytelling for up to 8 players primarily through voice interaction.
 
 ## Project Goal
 
@@ -14,7 +16,7 @@ Discord: https://discord.gg/FGUgzat3
 
 ## Features
 
-*   **AI Dungeon Master:** Leverages a Large Language Model (LLM) via LM Studio for dynamic storytelling and NPC dialogue.
+*   **AI Dungeon Master:** Leverages a Large Language Model (LLM) via LM Studio for dynamic storytelling and NPC dialogue. Ideally, LM Studio will be replaced with a generic OpenAI API.
 *   **Voice Interaction:** Uses faster-whisper for Speech-to-Text (STT) with Voice Activity Detection (VAD).
 *   **Text-to-Speech (TTS):** Employs Kokoro-TTS for generating DM and NPC voices.
 *   **Multiple Voices:** Supports distinct voices for different characters/narrator using `<voice:TAG>` syntax processed by the backend (Kokoro and potentially RVC overlays - RVC currently optional/commented out).

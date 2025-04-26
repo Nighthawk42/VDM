@@ -1,6 +1,6 @@
 # Virtual Dungeon Master (VDM)
 
-![Virtual Dungeon Master Logo](https://i.imgur.com/Kv4rIog.png)
+![Virtual Dungeon Master Logo](https://i.imgur.com/qGDHTpk.png)
 
 A Python-based application designed to act as a virtual dungeon master for tabletop role-playing games, facilitating freeform storytelling for up to 8 players primarily through voice interaction.
 
@@ -98,7 +98,6 @@ Discord: https://discord.gg/FGUgzat3
     *   Open a command prompt or terminal in the project root directory (`C:\Users\Nighthawk\Documents\GitHub\Storyteller`).
     *   Use the provided batch scripts:
         *   Double-click `launch.bat` to run `main.py` directly using the `uv` environment.
-        *   Double-click `venv.bat` to open a new terminal window with the virtual environment already activated. You can then run `python main.py` manually in that window.
 
 ## Configuration (`config.yaml`)
 
@@ -118,12 +117,6 @@ Discord: https://discord.gg/FGUgzat3
 
 *   **Host Mode:** Runs the full backend pipeline (STT, SpeakerID, LLM, TTS) and serves clients. Requires significant compute resources (especially GPU VRAM). The host can also act as a player.
 *   **Client Mode:** Connects to a running host. Handles local audio input/output and displays text chat/narration. Requires fewer resources.
-
-*(Further details on enrollment, gameplay flow, etc., can be added as the project develops)*
-
-## Contributing
-
-This project is currently maintained solely by Nighthawk42. Contributions are not actively sought at this time.
 
 ## License
 

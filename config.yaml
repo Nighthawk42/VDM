@@ -1,0 +1,104 @@
+# config.yaml
+
+# ────────────────────────────────────────────────────────────────────
+#   Mode - Host or Client
+# ────────────────────────────────────────────────────────────────────
+mode: host # "host" = Co-DM and backend; "client" = player only
+
+# ────────────────────────────────────────────────────────────────────
+#   Prompts - Game Master (DM) and Player Interaction
+# ────────────────────────────────────────────────────────────────────
+prompts:
+  system: |
+    You are the Dungeon Master for an epic, freeform tabletop RPG.
+    Narrate vividly and fairly. By default, speak as the "narrator" voice (defined in tts.voices).
+    If you want to change your tone or character voice, wrap your
+    text in <voice:TAG>…</voice> tags, where TAG is one of the keys defined
+    in either the 'tts.voices' or 'rvc.voices' sections below (e.g., narrator, elf, dwarf).
+    Only use defined voice tags. Do not invent new tags.
+    After every narration or significant NPC dialogue, ask the players
+    collectively or individually, "What do you do?". Keep track of NPCs,
+    locations, and player inventory implicitly through the conversation history.
+  game_start: |
+    <voice:narrator>Welcome, brave souls, to the shadowed entrance of the Whispering Caves. A cold draft carrying the scent of damp earth and something ancient greets you. The only light flickers from your torch, casting long, dancing shadows. Before you lies darkness.</voice> What do you do first?
+  assist_template: |
+    {{speaker}} says: "{{text}}"
+    DM should respond with narration and any NPC speech, using <voice:TAG>...</voice> tags appropriately for different characters or tones based on the context.
+
+# ────────────────────────────────────────────────────────────────────
+#   Networking, STT, Speaker, LLM - Configuration
+# ────────────────────────────────────────────────────────────────────
+network:
+  host: "0.0.0.0"
+  port: 8765
+stt:
+  model_size: "large-v3" 
+  device: "cuda" # "cuda" for GPU, "cpu" for CPU
+  compute_type: "float16" # "float16" for GPU, "int8" for CPU 
+  vad: 
+    min_silence_duration_ms: 700 # Minimum silence duration to consider end of speech
+speaker:
+  use_embeddings: true
+  model_name: "speechbrain/spkrec-ecapa-voxceleb" # Example model name, replace with actual
+  similarity_threshold: 0.70 
+  enrollment_duration_s: 5
+llm:
+  model_key: "lmstudio-community/Meta-Llama-3.1-8B-Instruct-GGUF/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf" # Example, replace
+  temperature: 0.7
+  max_tokens: 512
+
+# ────────────────────────────────────────────────────────────────────
+#   Text-to-Speech (Kokoro Native Voices)
+# ────────────────────────────────────────────────────────────────────
+tts:
+  # This default tag MUST exist as a key in this tts.voices section
+  default_voice: narrator
+  voices:
+    # Define native Kokoro voices accessible via <voice:TAG>
+    # Backend is implicitly 'kokoro' for this section
+    narrator:
+      voice: "en-US-Neural2-J" # Example Kokoro voice ID
+      speed: 1.0
+    elf:
+      voice: "en-US-Wavenet-D"
+      speed: 1.1
+    villain:
+      voice: "en-GB-News-K"
+      speed: 0.9
+
+# ────────────────────────────────────────────────────────────────────
+#   RVC (Retrieval-based Voice Conversion) Voices
+# ────────────────────────────────────────────────────────────────────
+rvc:
+  # Define voices that use an RVC model overlaid on a base Kokoro voice
+  # Accessible via <voice:TAG> - Tags here should be unique from tts.voices tags
+  voices:
+    # --- Example RVC Voice (Commented Out) ---
+    # dwarf: # Tag used like <voice:dwarf>
+    #   model_path: "data/rvc_models/dwarf_voice/dwarf.pth" # Required: Path to RVC .pth model
+    #   index_path: "data/rvc_models/dwarf_voice/dwarf.index" # Optional: Path to .index file
+    #   # RVC Inference Parameters
+    #   pitch: 0             # Pitch adjustment in semitones (+/-)
+    #   index_rate: 0.75     # Feature search ratio (0.0 to 1.0)
+    #   protect: 0.33        # Voiceless consonant protection (0.0 to 0.5)
+    #   # Base Voice Generation (using Kokoro)
+    #   base_kokoro_voice: "en-US-Standard-F" # Required: Kokoro voice ID for base audio
+    #   base_kokoro_speed: 1.0                # Optional: Speed for base audio generation
+    pass # Add this if 'voices' is empty or all commented out, YAML needs a value
+
+# ────────────────────────────────────────────────────────────────────
+#   Paths, UI, Audio (Sections unchanged)
+# ────────────────────────────────────────────────────────────────────
+paths:
+  enrollment_dir: "data/voice_profiles" # Directory for voice profiles
+  gamestate_file: "data/gamestate.json" # File to save game state 
+  rvc_models_dir: "data/rvc_models" # Base dir for RVC models
+ui:
+  max_log_lines: 100 # Max lines in the UI log 
+  timestamp_format: "%H:%M:%S" # Timestamp format for log entries 
+audio: 
+  input_device_index: null # Set to null for default device, or specify index for a specific device
+  output_device_index: null # Set to null for default device, or specify index for a specific device 
+  sample_rate: 16000 # Sample rate for audio processing 
+  channels: 1 # Number of audio channels (1 for mono, 2 for stereo)
+  chunk_size_ms: 100 # Chunk size for audio processing in milliseconds

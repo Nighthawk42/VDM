@@ -1,0 +1,10 @@
+*.env
+*.wav
+*.pyc
+memory/chroma_db/85bfab4b-517c-4773-b8a8-e8358c4e4337/data_level0.bin
+memory/chroma_db/85bfab4b-517c-4773-b8a8-e8358c4e4337/header.bin
+memory/chroma_db/85bfab4b-517c-4773-b8a8-e8358c4e4337/length.bin
+memory/chroma_db/85bfab4b-517c-4773-b8a8-e8358c4e4337/link_lists.bin
+memory/chroma_db/chroma.sqlite3
+memory/users.json
+memory/vdm_sessions.db

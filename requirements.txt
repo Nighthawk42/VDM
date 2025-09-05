@@ -1,0 +1,30 @@
+# Core server
+fastapi
+uvicorn
+pydantic
+starlette
+orjson
+httpx
+
+# Vector & embeddings
+chromadb
+sentence-transformers
+# NumPy 2 + SciPy that plays nice with it
+numpy==2.0
+scipy
+
+# Audio stack (modern, NumPy 2 compatible)
+librosa
+soundfile
+soxr
+
+# TTS / GPU bits you were already using (pin to your known-good set)
+#torch
+#torchaudio
+#torchvision
+
+# Kokoro TTS (your current)
+kokoro
+
+# Misc already in your tree
+rich

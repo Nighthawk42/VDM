@@ -1,0 +1,87 @@
+# ==============================================================================
+# VDM - VIRTUAL DUNGEON MASTER
+#
+# Application Settings
+#
+# This file controls the core behavior of the application.
+# For secrets and environment-specific values (API keys, ports), use .env
+# ==============================================================================
+
+
+# === SECTION: Core AI & Narrative =============================================
+# Controls the behavior of the Large Language Model (LLM) as the storyteller.
+# ------------------------------------------------------------------------------
+llm:
+  # The primary AI service to use for generating story content.
+  # Make sure the corresponding URL/API Key is set in your .env file.
+  # Options: "lmstudio", "ollama", "openrouter"
+  backend: "lmstudio"
+
+  # The model identifier for the chosen backend.
+  # Example for OpenRouter: "google/gemma-2-9b-it"
+  # Example for LM Studio: "gemma-2-9b-it-gguf" (or whatever you have loaded)
+  story_model: "google/gemma-3n-e4b"
+
+  # The format for sending player actions to the AI.
+  # "json": (Recommended) More reliable and less ambiguous for modern models.
+  # "legacy_text": A simpler text format for older or less capable models.
+  prompting_strategy: "json"
+
+  # Set to 'true' if your model is specifically trained to use <thinking> and
+  # <RESPONSE> tags. For most models, this should be 'false'.
+  llm_uses_tags: false
+
+  # The maximum number of recent messages to include in the context sent to the AI.
+  # A larger number provides more short-term context but increases processing load.
+  context_messages: 20
+
+
+# === SECTION: Audio & Streaming ===============================================
+# Configures the text-to-speech (TTS), voice casting, and streaming behavior.
+# ------------------------------------------------------------------------------
+audio:
+  # Master switch for the real-time streaming of text and audio.
+  # true:  Responds instantly, but is more CPU-intensive. May cause audio stutter
+  #        on less powerful machines.
+  # false: Waits for the full response before playing audio. Less demanding.
+  enable_streaming: false
+
+  # Master switch for the Dynamic Voice Casting feature (using RVC).
+  # If enabled, the AI can use different voices for different characters
+  # based on the voice casting file below. Requires RVC models.
+  enable_dynamic_casting: false
+
+  # The default Kokoro voice used for narration if dynamic casting is off,
+  # or as a fallback voice for unassigned characters.
+  default_voice: "af_heart"
+
+
+# === SECTION: Memory & Persistence ============================================
+# Configures the AI's long-term memory and how game sessions are saved.
+# ------------------------------------------------------------------------------
+memory:
+  # The SentenceTransformer model used to create embeddings for the AI's
+  # long-term memory (RAG). This runs locally.
+  embedding_model: "sentence-transformers/all-MiniLM-L6-v2"
+
+  # The file path for the SQLite database where all game sessions, players,
+  # and messages are saved.
+  database_file: "./memory/vdm_sessions.db"
+
+
+# === SECTION: Resource Paths ==================================================
+# Defines where the application should find its configuration and save output.
+# ------------------------------------------------------------------------------
+paths:
+  # Path to the YAML file containing all AI system prompts.
+  prompts_file: "./prompts.yml"
+  
+  # Path to the YAML file that maps character names to specific voices for
+  # the Dynamic Voice Casting feature.
+  voices_file: "./voices.yml"
+
+  # Directory where the long-term memory vector database (ChromaDB) is stored.
+  memory_dir: "./memory"
+
+  # Directory where generated TTS audio files are saved.
+  audio_out_dir: "./audio_out"

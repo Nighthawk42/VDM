@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VDM - Virtual Dungeon Master</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+    <header>
+        <div id="app-title">VDM</div>
+        <button id="theme-toggle" title="Toggle Light/Dark Mode">🌙</button>
+    </header>
+
+    <main>
+        <div id="login-view" class="sidebar-section auth-form-container">
+            <h3>Welcome Back!</h3>
+            <form id="login-form">
+                <div>
+                    <label for="login-name">Username</label>
+                    <input type="text" id="login-name" placeholder="Your Username" required>
+                </div>
+                <div>
+                    <label for="login-password">Password</label>
+                    <input type="password" id="login-password" placeholder="Your Password" required>
+                </div>
+                <button type="submit">Log In</button>
+            </form>
+            <div id="login-error" class="error-message" style="display: none;"></div>
+            <p class="small-text">Don't have an account? <button type="button" id="switch-to-register" class="link-button">Create one</button></p>
+        </div>
+
+        <div id="register-view" class="sidebar-section auth-form-container" style="display: none;">
+            <h3>Create Your Player</h3>
+            <form id="register-form">
+                <div>
+                    <label for="register-name">Username</label>
+                    <input type="text" id="register-name" placeholder="e.g., Elara" required>
+                </div>
+                <div>
+                    <label for="register-password">Password</label>
+                    <input type="password" id="register-password" placeholder="Create a password" required>
+                </div>
+                <div>
+                    <label for="register-confirm-password">Confirm Password</label>
+                    <input type="password" id="register-confirm-password" placeholder="Confirm password" required>
+                </div>
+                <div class="avatar-selection">
+                    <label>Choose an Avatar Style</label>
+                    <div class="avatar-preview-container">
+                        <img id="register-avatar-preview" src="" alt="Avatar Preview">
+                    </div>
+                    <div id="avatar-selection-grid" class="avatar-grid"></div>
+                </div>
+                <button type="submit">Register</button>
+            </form>
+            <div id="register-error" class="error-message" style="display: none;"></div>
+            <p class="small-text">Already have an account? <button type="button" id="switch-to-login" class="link-button">Log in</button></p>
+        </div>
+
+        <div id="main-app-view" style="display: flex; flex-grow: 1; overflow: hidden;">
+            <aside class="sidebar">
+                <div id="player-identity" class="sidebar-section" style="display: none;">
+                    <h3>My Identity</h3>
+                    <div class="player-card">
+                        <img id="player-card-avatar" src="" alt="Player Avatar">
+                        <span id="player-card-name"></span>
+                    </div>
+                    <button type="button" id="logout-button">Change Identity</button>
+                </div>
+                <div id="connection-form" class="sidebar-section" style="display: none;">
+                    <h3>Join a Game</h3>
+                    <div>
+                        <label for="room-id-input">Room ID</label>
+                        <input type="text" id="room-id-input" value="dungeon-one" placeholder="e.g., dragon-lair" required>
+                    </div>
+                    <button type="button" id="join-button">Join Game</button>
+                </div>
+                <div id="room-info" class="sidebar-section" style="display: none;">
+                    <h3>Room: <span id="room-name"></span></h3>
+                    <div id="player-list-container">
+                        <h4>Players</h4>
+                        <ul id="player-list"></ul>
+                    </div>
+                    <div id="host-controls-container" style="display: none;">
+                        <h4>Host Controls</h4>
+                        <button type="button" id="start-game-button">Start Game</button>
+                        <button type="button" id="resume-game-button">Resume Game</button>
+                    </div>
+                    <button type="button" id="leave-button" class="mt-auto">Leave Room</button>
+                </div>
+            </aside>
+
+            <section class="chat-area">
+                <div id="chat-log">
+                    <div class="msg system">Welcome to VDM! Please log in or register to start.</div>
+                </div>
+                <div id="gm-thinking-indicator" style="display: none;">
+                    <div class="spinner"></div>
+                    <span>The GM ponders...</span>
+                </div>
+                <div class="chat-input-area">
+                    <div id="command-preview"></div>
+                    <textarea id="message-input" placeholder="Enter your action or message..." rows="1" disabled></textarea>
+                    <button id="mic-button" type="button" title="Hold to Talk" style="display: none;" disabled>🎤</button>
+                    <button id="send-button" type="button" title="Send your action or message" disabled>Send</button>
+                    <button id="resolve-button" type="button" title="Submit all actions and continue the story" disabled>Continue ▶</button>
+                </div>
+            </section>
+        </div>
+    </main>
+    <script type="module" src="/static/js/app.js"></script>
+</body>
+</html>

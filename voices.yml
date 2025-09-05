@@ -1,0 +1,36 @@
+# ===================================================================
+# VDM - Voice Casting Configuration
+# ===================================================================
+# This file maps character names to specific TTS or RVC voices.
+
+# --- Default Voices ---
+# These are used for narration or as fallbacks for unassigned characters.
+defaults:
+  # The primary voice for narration (non-dialogue text).
+  narrator: "af_heart"
+  
+  # A fallback male voice if needed (future feature).
+  male: "am_michael"
+
+# --- Character Voice Casting ---
+# Map specific character names to voices. The name is case-insensitive.
+characters:
+
+  # --- RVC EXAMPLE: A custom voice model ---
+  # To use this, you must have the specified .onnx and .index files.
+  Gandalf:
+    # The initial TTS voice used before conversion. Choose one that matches the pitch.
+    base_voice: "am_puck"
+    
+    # Paths to your RVC model files.
+    rvc_model: "./models/rvc/gandalf.onnx"
+    rvc_index: "./models/rvc/gandalf.index"
+
+  # --- KOKORO EXAMPLE: A specific default voice ---
+  # This character will simply use a different Kokoro voice, no RVC.
+  Aragorn:
+    kokoro_voice: "am_fenrir"
+
+  # --- KOKORO EXAMPLE 2 ---
+  Galadriel:
+    kokoro_voice: "af_bella"

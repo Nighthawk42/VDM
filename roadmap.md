@@ -3,88 +3,52 @@
 This document outlines the history, current state, and planned future of the Virtual Dungeon Master application.
 
 ---
+## ✅ Completed Milestones
 
-## ✅ **Phase 1: Core Systems (Completed)**
+This section lists the major features and architectural improvements that are fully implemented, stable, and working in the current version of the project.
 
-This phase focused on building a stable, feature-rich, and fully playable foundation. All items in this section are implemented and working.
+#### Core Backend & Systems
+- **[x] Robust Server Foundation**: FastAPI backend with a real-time WebSocket manager for multiplayer communication.
+- **[x] Pluggable LLM Backends**: Support for multiple AI providers, including LM Studio, Ollama, and OpenRouter.
+- **[x] Secure User Accounts**: Persistent user accounts with hashed passwords stored in a dedicated SQLite database.
+- **[x] Persistent Server Sessions**: User logins survive server restarts for a seamless experience.
+- **[x] Room & Game Persistence**: Full game state (messages, players) is saved and loaded automatically from a SQLite database.
 
--   **Core Backend & Networking:**
-    -   [x] FastAPI server with WebSocket manager.
-    -   [x] LAN/VPN accessibility via `0.0.0.0` and HTTPS/SSL support.
-    -   [x] CORS configuration for deployment flexibility.
+#### Advanced RAG Pipeline
+- **[x] State-of-the-Art Embeddings**: Utilizes Google's `EmbeddingGemma` model for high-quality text embeddings.
+- **[x] Intelligent Chunking**: Integrated the `Chonkie` library to perform advanced semantic chunking on text for superior memory creation.
+- **[x] Local Vector Store**: Employs `ChromaDB` for efficient, local long-term memory storage and retrieval.
 
--   **Professional Tooling:**
-    -   [x] Centralized YAML-based configuration (`config.yml`, `prompts.yml`, `voices.yml`).
-    -   [x] Type-safe Pydantic settings models.
-    -   [x] Beautiful console logging with `rich` and intelligent warning suppression.
-
--   **AI & Storytelling:**
-    -   [x] Pluggable LLM provider system (LM Studio, Ollama, OpenRouter).
-    -   [x] Externalized, customizable GM prompts.
-    -   [x] Configurable LLM tag parsing (`<thinking>`/`<RESPONSE>`).
-
--   **Long-Term Memory (RAG):**
-    -   [x] Custom RAG pipeline using `sentence-transformers` and `ChromaDB`.
-    -   [x] Automatic memory creation from GM responses.
-    -   [x] Manual memory creation via the `/remember` command.
-    -   [x] RAG-augmented prompts to provide the AI with long-term context.
-
--   **Audio Narration:**
-    -   [x] High-quality TTS using the stable `kokoro` (PyTorch) library.
-    -   [x] Intelligent text sanitization for clean, immersive audio.
-
--   **Frontend UI/UX:**
-    -   [x] Modern, single-page application with a polished Material Design theme.
-    -   [x] Persistent Light/Dark mode.
-    -   [x] Discord-style slash command preview.
-    -   [x] Dynamic, auto-generating player avatars.
-
--   **Game Mechanics & Persistence:**
-    -   [x] Full session saving and loading (`/save` command and automatic loading).
-    -   [x] Multiplayer lobby system with a designated host and "Start Game" flow.
-    -   [x] Turn-based action system (`/next` command or "Continue Story" button).
-    -   [x] Dice roller (`/roll`) and OOC chat (`/ooc`).
+#### Immersive Frontend & UI/UX
+- **[x] Modular Frontend Architecture**: The entire JavaScript frontend has been refactored into small, maintainable modules for features like auth, audio, commands, and rendering.
+- **[x] Speech-to-Text**: Players can use their microphone to speak their actions.
+- **[x] Secure Markdown Rendering**: Chat messages are rendered with Markdown for rich text formatting (*italics*, **bold**) and sanitized with DOMPurify for security.
+- **[x] Visual Turn Indicator**: The UI clearly shows which players have submitted their action for the current turn.
+- **[x] Persistent Light/Dark Modes**: A modern, clean interface with a theme toggle.
+- **[x] Helper UI**: Includes a command previewer and dynamic avatar selection.
 
 ---
+## 🎯 Current Focus
 
-## 🎯 **Phase 2: Advanced Immersion & Interaction (Current Focus)**
+This section outlines the next set of user-facing features we are focused on developing.
 
-This phase is about adding layers of dynamic interaction and immersion on top of our stable foundation.
-
-### 1. Dynamic Voice Casting System (RVC Integration)
--   **Goal:** Allow the GM to use different voices for different characters, including custom voice models.
--   **Status:** The configuration (`voices.yml`), prompting (`<v>` tags), and feature flags are **DONE**.
--   **To-Do:**
-    -   [ ] Rebuild the `AudioManager` into an "Audio Director" that parses `<v>` tags, consults the casting sheet, and orchestrates the TTS/RVC pipeline for each dialogue segment.
-    -   [ ] Fully integrate the PyTorch-based `tts-with-rvc` library for handling voice conversions.
-
-### 2. Speech-to-Text (Client-Side)
--   **Goal:** Allow players to speak their actions instead of typing.
--   **Plan:**
-    -   [ ] Implement the browser's **Web Speech API**, which requires no backend changes.
-    -   [ ] Add a "Hold to Talk" microphone button to the UI.
-    -   [ ] The browser will handle transcription, and the resulting text will be placed in the input box.
+- **[ ] GM-Triggered Sound Effects**: Implement a system where the AI can use a special tag (e.g., `<sfx name="door_creak" />`) in its response to trigger pre-loaded sound effects on the client side, enhancing immersion.
+- **[ ] Player "Typing..." Indicator**: Add a visual indicator to the UI that shows when other players in the room are actively typing a message, improving the sense of presence in multiplayer.
+- **[ ] GM-to-Player Whispers**: Create a system for the AI to send secret messages to a single player via a tag like `<whisper to="PlayerName">You notice a secret...</whisper>`, allowing for private information and plot twists.
 
 ---
+## 🚀 Future Goals
 
-## 🚀 **Phase 3: Structured Gameplay & World Systems**
+This section lists larger, more complex systems to be considered after the current feature set is complete and polished.
 
-This phase will transform the VDM from a pure storyteller into a true "Game Master" that understands and enforces rules.
+#### Structured Gameplay Systems
+- **Character Sheets**: Introduce a simple data model for character sheets to track stats like HP, attributes, and inventory.
+- **Systematized Skill Checks**: Evolve the AI from a storyteller into a true Game Master by teaching it to request skill checks from the backend (e.g., `<check skill="dexterity" difficulty="15" />`) rather than deciding outcomes itself. This separates the **Rules Arbitrator** (our code) from the **Storyteller** (the AI).
 
-### 1. Structured Game Mechanics (`game_manager.py`)
--   **Character Sheets:** Implement a simple Pydantic model for character sheets (`hp`, `stats`, `inventory`) and store them in the `Room` state.
--   **Inventory System:** Allow the LLM to grant items via a special tag (e.g., `<ITEM name="Health Potion" />`), which is then parsed by the server and added to a player's character sheet.
--   **Systematized Skill Checks:** This is a major goal.
-    1.  Teach the LLM to request a skill check instead of deciding an outcome (e.g., `<ACTION type="skill_check" skill="dexterity" difficulty="15" />`).
-    2.  The server parses this, calls our `DiceRoller`, compares the result to the difficulty, and determines success/failure.
-    3.  The server then calls the LLM *again* with the result ("System: The dexterity check succeeded. Narrate the outcome.").
-    4.  This separates the **Rules Arbitrator** (our code) from the **Storyteller** (the AI).
+#### Advanced Multimedia & Immersion
+- **Dynamic Voice Casting (RVC)**: Fully integrate a Retrieval-based Voice Conversion (RVC) library to give unique, custom voices to different NPCs based on the `<v name="...">` tags.
+- **AI-Generated Scene Imagery**: Allow the AI to generate and display images for key scenes or characters using a tag like `<image prompt="..." />`.
 
-### 2. Deeper AI & World Integration
--   **AI-Powered Image Generation:** Allow the GM to generate images for scenes or characters via a tag like `<IMAGE prompt="A dark, mossy cave entrance" />`. The server would send this to an image generation API and display the result in the chat.
--   **NPC Management:** Create a dedicated system for managing Non-Player Characters, storing their character sheets, personalities, and key memories in the RAG database.
-
-### 3. Production & Quality of Life
--   **User Authentication:** A simple user system to allow for persistent player identities.
--   **Database Backend:** For larger scale, migrate from JSON file persistence to a more robust database like SQLite.
--   **Admin Dashboard:** A simple web interface for the server host to view logs, manage rooms, and adjust AI settings on the fly.
+#### Operational Excellence
+- **Docker Support**: Containerize the entire application with a `Dockerfile` and `docker-compose.yml` for easy, one-command deployment.
+- **Automated Testing**: Build a test suite using `pytest` to ensure code quality and prevent regressions.

@@ -55,9 +55,13 @@ class _STEmbedder:
     """Sentence-Transformers wrapper that returns numpy arrays with the right dtype."""
     def __init__(self, model_name: str) -> None:
         self.model = SentenceTransformer(model_name, device="cpu")
+        # NOTE: You may see a warning about a missing `config.json`. This is expected
+        # for some models like EmbeddingGemma and can be safely ignored.
         logger.info(f"SentenceTransformer loaded: {model_name}")
 
     def embed(self, texts: Iterable[str]) -> np.ndarray:
+        """Encodes a list of texts into numpy embeddings."""
+        # Note: EmbeddingGemma requires float32, this code ensures that.
         arr = self.model.encode(
             list(texts),
             normalize_embeddings=True,
@@ -83,8 +87,8 @@ class MemoryMeta(TypedDict, total=False):
 # ---------- Memory manager ----------
 
 class MemoryManager:
+    """Manages the vector database for the AI's long-term memory."""
     def __init__(self):
-        # FIX: Updated to use the new setting path from the reorganized config.
         self.memory_dir = Path(settings.paths.memory_dir)
         self.memory_dir.mkdir(parents=True, exist_ok=True)
 
@@ -95,22 +99,27 @@ class MemoryManager:
                 settings=chroma_settings,
             )
             logger.info("ChromaDB PersistentClient initialized (telemetry OFF).")
-            # FIX: Now uses the embedding model specified in the settings file.
             self.embedder = _STEmbedder(settings.memory.embedding_model)
         except Exception:
             logger.critical("Failed to initialize MemoryManager.", exc_info=True)
             raise
 
     def _collection_name(self, room_id: str) -> str:
+        """Generates a ChromaDB collection name for a given room."""
         return f"vdm_{room_id}"
 
     def _get_collection(self, room_id: str):
+        """Retrieves or creates a ChromaDB collection for a room."""
         return self.chroma.get_or_create_collection(
             name=self._collection_name(room_id),
             metadata={"hnsw:space": "cosine"},
         )
 
     def add_memory(self, room_id: str, text: str) -> None:
+        """
+        Adds a piece of text to the long-term memory for a room.
+        It automatically formats the text for the selected embedding model.
+        """
         if not text or not text.strip():
             return
         try:
@@ -119,11 +128,20 @@ class MemoryManager:
             chunks: List[str] = _chunk_sentences(sentences, max_chars=700, overlap=1)
             if not chunks: return
 
-            embeds_np: np.ndarray = self.embedder.embed(chunks)
+            # NEW: Add model-specific prefixes for backward compatibility.
+            # This formats the text for EmbeddingGemma, but leaves other models unchanged.
+            if "embeddinggemma" in settings.memory.embedding_model:
+                # This is a "document" for storage.
+                formatted_chunks = [f"text: {c}" for c in chunks]
+            else:
+                formatted_chunks = chunks
+
+            embeds_np: np.ndarray = self.embedder.embed(formatted_chunks)
             col = self._get_collection(room_id)
 
             ts = int(time.time())
             ids: List[str] = [uuid.uuid4().hex for _ in chunks]
+            # We store the ORIGINAL, unprefixed text in the database.
             metadatas: List[Dict[str, Primitive]] = [
                 {"room_id": room_id, "ts": ts, "len": len(c)} for c in chunks
             ]
@@ -138,6 +156,10 @@ class MemoryManager:
             logger.error(f"Failed to add memory to room '{room_id}'.", exc_info=True)
 
     def search_memory(self, room_id: str, query_text: str, k: int = 3) -> List[str]:
+        """
+        Searches the long-term memory for relevant information.
+        It automatically formats the query for the selected embedding model.
+        """
         if not query_text or not query_text.strip():
             return []
         try:
@@ -145,7 +167,14 @@ class MemoryManager:
             if col.count() == 0:
                 return []
 
-            q_np: np.ndarray = self.embedder.embed([query_text])
+            # Add model-specific prefixes for backward compatibility.
+            if "embeddinggemma" in settings.memory.embedding_model:
+                # This is a "query" for retrieval.
+                formatted_query = f"task: search result | query: {query_text}"
+            else:
+                formatted_query = query_text
+
+            q_np: np.ndarray = self.embedder.embed([formatted_query])
             result = col.query(
                 query_embeddings=cast(Any, q_np),
                 n_results=max(1, k),

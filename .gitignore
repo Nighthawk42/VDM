@@ -45,6 +45,9 @@ local_digest.txt
 *.njsproj
 *.sln
 *.sw?
+*.db
+*.bat
+*.ps1
 
 # macOS
 .DS_Store

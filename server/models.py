@@ -6,22 +6,13 @@ from typing import Dict, List, Literal, Any, Optional
 # Core Game & Application Models
 # ===================================================================
 
-class PlayerSheet(BaseModel):
-    """Represents a player's character sheet with stats and inventory."""
-    hp: int = 10
-    max_hp: int = 10
-    # Placeholders for future expansion
-    # attributes: Dict[str, int] = Field(default_factory=dict)
-    # inventory: List[str] = Field(default_factory=list)
-
-
 class Player(BaseModel):
     """Represents a player within a game room."""
     id: str
     name: str
     avatar_style: str = "adventurer"
     is_active: bool = True
-    sheet: PlayerSheet = Field(default_factory=PlayerSheet)
+    # REMOVED: The 'sheet' attribute has been removed from the Player model.
 
 
 class ChatMessage(BaseModel):
@@ -41,6 +32,7 @@ class Room(BaseModel):
     current_turn_actions: Dict[str, str] = Field(default_factory=dict)
     game_state: Literal["LOBBY", "PLAYING"] = "LOBBY"
     host_player_id: Optional[str] = None
+    owner_username: Optional[str] = None
 
 class RegisterRequest(BaseModel):
     """Model for the /api/register endpoint payload."""

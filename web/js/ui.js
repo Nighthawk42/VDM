@@ -4,6 +4,7 @@ import { dom } from './dom-elements.js';
 import { initSpeechRecognition } from './speech-recognition.js';
 import { initCommandPreview } from './commands.js';
 import { initAvatarSelection } from './avatars.js';
+import { renderMarkdown } from './markdown-renderer.js';
 
 /**
  * @typedef {import('./state.js').AppState} AppState
@@ -11,31 +12,14 @@ import { initAvatarSelection } from './avatars.js';
  */
 
 /**
- * @typedef {object} AppUI - The public interface of the UI module.
- * @property {(api: ReturnType<ApiModule>) => void} setApi
- * @property {(type: string, data: any, isBatch: boolean) => void} logMessage
- * @property {(messages: any[]) => void} loadChatHistory
- * @property {(room: any) => void} updateRoomState
- * @property {(url: string) => void} playAudioFile
- * @property {() => void} handleStreamStart
- * @property {(content: string) => void} handleChatChunk
- * @property {(chunk: ArrayBuffer) => void} handleAudioChunk
- * @property {(finalMessage: any) => void} handleStreamEnd
- * @property {(roomId: string) => void} showRoomView
- * @property {() => void} showConnectionView
- * @property {() => void} showLoginView
- */
-
-/**
  * Initializes and returns the UI module, which orchestrates all sub-modules.
  * @param {AppState} state - The central state object.
- * @returns {AppUI}
+ * @returns {object} The public interface for the UI module.
  */
 export function initUI(state) {
     let api = null;
     const audio = initAudio(state);
     
-    // Initialize all imported UI sub-modules
     const speech = initSpeechRecognition({
         onFinalResult: (text) => { dom.messageInput.value = text; },
         onStatusChange: (isListening) => { dom.micButton.classList.toggle('listening', isListening); }
@@ -43,9 +27,6 @@ export function initUI(state) {
     initCommandPreview(dom);
     initAvatarSelection(dom, state);
 
-    /**
-     * Main render function to switch between the primary UI views (auth vs. app).
-     */
     function _render() {
         const mainElement = document.querySelector('main');
         dom.loginView.style.display = 'none';
@@ -59,10 +40,9 @@ export function initUI(state) {
             } else {
                 dom.registerView.style.display = 'flex';
             }
-        } else { // 'chat' or other authenticated views
+        } else {
             mainElement.className = 'app-mode';
             dom.mainAppView.style.display = 'flex';
-
             if (state.playerInfo) {
                 dom.playerIdentity.style.display = 'flex';
                 dom.playerCardName.textContent = state.playerInfo.name;
@@ -70,7 +50,6 @@ export function initUI(state) {
             } else {
                 dom.playerIdentity.style.display = 'none';
             }
-            
             if (state.isConnected) {
                 dom.connectionForm.style.display = 'none';
                 dom.roomInfo.style.display = 'flex';
@@ -81,23 +60,18 @@ export function initUI(state) {
         }
     }
 
-    /** Displays an error message in a designated element. */
     function _showError(element, message) {
         element.textContent = message;
         element.style.display = 'block';
     }
 
-    /** Hides an error message element. */
     function _hideError(element) {
         element.style.display = 'none';
     }
 
-    /** Attaches all persistent event listeners for the application. */
     function _attachListeners() {
-        // --- Auth & Connection Listeners ---
         dom.switchToRegisterBtn.addEventListener('click', () => { state.uiView = 'register'; _render(); });
         dom.switchToLoginBtn.addEventListener('click', () => { state.uiView = 'login'; _render(); });
-
         dom.registerForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             _hideError(dom.registerError);
@@ -109,7 +83,6 @@ export function initUI(state) {
             if (result.success) { alert(result.message); state.uiView = 'login'; _render(); } 
             else { _showError(dom.registerError, result.message); }
         });
-
         dom.loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             _hideError(dom.loginError);
@@ -123,15 +96,12 @@ export function initUI(state) {
                 _render();
             } else { _showError(dom.loginError, result.message); }
         });
-        
         dom.logoutButton.addEventListener('click', () => api.logout());
         dom.joinButton.addEventListener('click', () => {
             const roomId = dom.roomIdInput.value.trim();
             if (roomId) api.connectToRoom(roomId);
         });
         dom.leaveButton.addEventListener('click', () => api.disconnect());
-
-        // --- Chat & Speech Listeners ---
         dom.sendButton.addEventListener('click', () => {
             const message = dom.messageInput.value.trim();
             if (message) api.sendMessage('say', { message });
@@ -149,13 +119,9 @@ export function initUI(state) {
         } else {
             dom.micButton.style.display = 'none';
         }
-
-        // --- Host & Game Listeners ---
         dom.resolveButton.addEventListener('click', () => api.sendMessage('submit_turn'));
         dom.startGameButton.addEventListener('click', () => api.sendMessage('start_game'));
         dom.resumeGameButton.addEventListener('click', () => api.sendMessage('resume_game'));
-
-        // --- Misc Listeners ---
         dom.themeToggle.addEventListener('click', () => {
             const isLight = document.body.classList.toggle('light-theme');
             localStorage.setItem('vdm-theme', isLight ? 'light' : 'dark');
@@ -167,13 +133,11 @@ export function initUI(state) {
         document.body.addEventListener('click', resumeAudio);
     }
     
-    // --- Initialize ---
     const savedTheme = localStorage.getItem('vdm-theme') || 'dark';
     document.body.classList.toggle('light-theme', savedTheme === 'light');
     _attachListeners();
     _render();
 
-    // --- Public Interface ---
     const publicInterface = {
         setApi(apiModule) { api = apiModule; },
         logMessage(type, data, isBatch = false) {
@@ -188,7 +152,6 @@ export function initUI(state) {
 
                 const avatarImg = document.createElement('img');
                 avatarImg.className = 'msg-avatar';
-                
                 const player = state.room?.players[data.author_id];
                 const avatarStyle = player ? player.avatar_style : 'bottts';
                 const avatarSeed = data.author_id === 'gm' ? 'GM' : encodeURIComponent(data.author_name);
@@ -196,15 +159,12 @@ export function initUI(state) {
 
                 const contentDiv = document.createElement('div');
                 contentDiv.className = 'msg-content';
-
                 const authorSpan = document.createElement('span');
                 authorSpan.className = 'author';
                 authorSpan.textContent = data.author_name;
-
                 const messageSpan = document.createElement('span');
-                let contentHTML = data.content.replace(/`([^`]+)`/g, '<code>$1</code>');
-                contentHTML = contentHTML.replace(/\*\*([^\*]+)\*\*/g, '<strong>$1</strong>');
-                messageSpan.innerHTML = contentHTML;
+                
+                messageSpan.innerHTML = renderMarkdown(data.content);
 
                 contentDiv.appendChild(authorSpan);
                 contentDiv.appendChild(messageSpan);
@@ -230,40 +190,34 @@ export function initUI(state) {
             Object.values(room.players).forEach(player => {
                 const playerLi = document.createElement('li');
                 playerLi.className = player.is_active ? 'player-active' : 'player-inactive';
-
                 const avatarImg = document.createElement('img');
                 avatarImg.className = 'player-list-avatar';
                 avatarImg.src = `https://api.dicebear.com/9.x/${player.avatar_style}/svg?seed=${encodeURIComponent(player.name)}`;
-
                 const nameSpan = document.createElement('span');
                 nameSpan.className = 'player-name';
                 nameSpan.textContent = player.name;
-                if (room.host_player_id === player.id) { nameSpan.textContent += ' 👑'; }
-
+                if (room.owner_username === player.name) { nameSpan.textContent += ' 👑'; }
                 const turnIndicator = document.createElement('span');
                 turnIndicator.className = 'turn-indicator';
                 if (room.current_turn_actions && room.current_turn_actions[player.id]) {
                     playerLi.classList.add('action-submitted');
                     turnIndicator.textContent = '✅';
                 }
-
-                // REMOVED: The hpSpan logic is gone.
-                
                 playerLi.appendChild(avatarImg);
                 playerLi.appendChild(nameSpan);
                 playerLi.appendChild(turnIndicator);
                 dom.playerList.appendChild(playerLi);
             });
             
-            const isHost = (state.playerInfo && room.host_player_id === state.clientId);
+            const isOwner = (state.playerInfo && room.owner_username === state.playerInfo.name);
             const inLobby = room.game_state === "LOBBY";
             const gmIsProcessing = room.turn_state === "GM_PROCESSING";
             const actionsExist = Object.keys(room.current_turn_actions || {}).length > 0;
             
             dom.gmThinkingIndicator.style.display = gmIsProcessing ? 'flex' : 'none';
-            dom.hostControlsContainer.style.display = isHost ? 'flex' : 'none';
-            dom.startGameButton.style.display = inLobby && isHost ? 'block' : 'none';
-            dom.resumeGameButton.style.display = !inLobby && isHost && room.messages.length > 0 ? 'block' : 'none';
+            dom.hostControlsContainer.style.display = isOwner ? 'flex' : 'none';
+            dom.startGameButton.style.display = inLobby && isOwner ? 'block' : 'none';
+            dom.resumeGameButton.style.display = !inLobby && isOwner && room.messages.length > 0 ? 'block' : 'none';
             dom.resolveButton.disabled = !actionsExist || gmIsProcessing;
             dom.messageInput.disabled = gmIsProcessing || inLobby;
             dom.sendButton.disabled = gmIsProcessing || inLobby;
@@ -303,10 +257,13 @@ export function initUI(state) {
                 dom.chatLog.scrollTop = dom.chatLog.scrollHeight;
             }
         },
-        handleAudioChunk(chunk) { audio.queueAndPlay(chunk); },
         handleStreamEnd(finalMessage) {
             if (state.activeStream && state.activeStream.messageElement) {
                 state.activeStream.messageElement.classList.remove('streaming');
+                if (finalMessage) {
+                    const finalContentSpan = state.activeStream.contentElement;
+                    finalContentSpan.innerHTML = renderMarkdown(finalMessage.content);
+                }
             }
             state.activeStream = null;
             audio.endStream();

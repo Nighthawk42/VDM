@@ -1,25 +1,41 @@
 # VDM - The Virtual Dungeon Master
 
-VDM is a multiplayer, AI-driven storytelling game designed for immersive, collaborative role-playing. It combines a powerful, locally-run backend with a clean web interface, allowing you and your friends to create and experience epic adventures narrated by a sophisticated AI Game Master.
+![VDM Logo](https://i.imgur.com/10m2zls.png)
 
-The project is built with a "Keep It Simple, Stupid" (KISS) philosophy, leveraging modern, high-performance tools to create a robust foundation that is easy to understand, maintain, and extend.
+VDM is a multiplayer, AI-driven storytelling game designed for immersive, collaborative role-playing. It combines a powerful, locally-run backend with a clean, modular web interface, allowing you and your friends to create and experience epic adventures narrated by a sophisticated AI Game Master.
 
-![VDM Thematic UI Screenshot](https://i.imgur.com/your-screenshot-url.png) <!-- Replace with a real screenshot URL -->
+The project is built with a focus on stability and cutting-edge features, leveraging modern, high-performance tools to create a robust foundation that is easy to understand, maintain, and extend.
 
 ---
 
 ## ✨ Features
 
-* **AI-Powered Game Master:** A sophisticated LLM (Large Language Model) acts as the storyteller, reacting to player actions, describing the world, and narrating events.
+### Core Gameplay
+* **AI-Powered Game Master:** A sophisticated LLM acts as the storyteller, reacting to player actions, describing the world, and narrating events.
 * **Real-Time Multiplayer:** Join a room with friends from anywhere. The game state is synchronized in real-time for a seamless collaborative experience.
-* **Thematic & Modern UI:** A beautiful and immersive user interface with selectable "Material" and "Thematic" (fantasy manuscript) styles, complete with a persistent light/dark mode.
-* **Dynamic Voice Narration:** The GM's responses are brought to life with high-quality, server-side Text-to-Speech.
-* **Long-Term Memory (RAG):** The AI has a true long-term memory, powered by a local vector database (`ChromaDB`). It automatically remembers key events and can be manually prompted to remember specific facts with the `/remember` command.
-* **Session Persistence:** Save your game at any time with the `/save` command. The server automatically reloads your session when you rejoin the room, so you can continue your adventure later.
-* **Turn-Based Gameplay:** A structured turn system allows players to declare their actions, which are then submitted to the GM as a single turn for resolution.
-* **Player-Driven Setup:** The adventure begins with the AI collaborating with the players to define the genre, tone, and setting of the story.
-* **Secure & Accessible:** Runs locally on your machine and can be securely accessed over your network (LAN, ZeroTier, Hamachi) via HTTPS.
+* **Turn-Based System:** A structured turn system allows players to declare their actions, which are then submitted to the GM as a single turn for resolution.
+* **Session Persistence:** Save your game with the `/save` command. The server automatically reloads your session when you rejoin the room.
+
+### Advanced AI Memory
+* **State-of-the-Art RAG Pipeline:** The AI has a true long-term memory, powered by Google's **EmbeddingGemma** model for top-tier embeddings and the **Chonkie** library for intelligent semantic chunking.
+* **Local Vector Store:** All memories are stored locally in a `ChromaDB` vector database.
+* **Manual Memory Control:** Players can use the `/remember` command to ensure critical facts are permanently stored in the AI's memory.
+
+### Immersive Experience
+* **High-Quality Voice Narration:** The GM's responses are brought to life with server-side Text-to-Speech using the `kokoro` library.
+* **Speech-to-Text Input:** A "Hold to Talk" microphone button allows players to speak their actions instead of typing.
+* **Markdown Rendering:** GM and player messages are rendered with Markdown for better formatting and readability (e.g., *italics* and **bold**).
+
+### Modern UI/UX
+* **Clean & Responsive Interface:** A modern single-page application that works on any device.
+* **Light/Dark Modes:** A persistent theme toggle for user comfort.
+* **Modular Frontend:** The JavaScript is broken down into small, maintainable modules for features like auth, commands, and avatars.
+* **Visual Turn Indicator:** See at a glance which players have submitted their action for the current turn.
+
+### Robust Backend
 * **Pluggable AI Backends:** Easily switch between different LLM providers, including local options like **LM Studio** and **Ollama**, or cloud services like **OpenRouter**.
+* **Secure User Accounts:** Player accounts are stored with hashed passwords in a dedicated SQLite database.
+* **Persistent Sessions:** User logins survive server restarts, allowing for a seamless reconnection experience.
 
 ---
 
@@ -30,114 +46,66 @@ Follow these steps to get your VDM server up and running.
 ### Prerequisites
 
 * **Python 3.11+**
-* **`uv`:** A fast Python package installer. If you don't have it, run:  
-  ```bash
-  pip install uv
-  ```
-* **`mkcert`:** For generating a trusted local SSL certificate (required for microphone access). [See mkcert installation instructions](https://github.com/FiloSottile/mkcert).
-* **(Optional) NVIDIA GPU:** For the best performance with local LLMs and RVC.
-
----
+* **`uv`**: A fast Python package installer. If you don't have it, run:
+    ```bash
+    pip install uv
+    ```
+* **(Optional) NVIDIA GPU**: For the best performance with local LLMs and TTS.
 
 ### 1. Project Setup
 
 First, clone or download the project repository.
 
----
+### 2. Create and Activate the Virtual Environment
 
-### 2. Create the Virtual Environment
-
-We use `uv` to create a consistent and fast virtual environment. Open your terminal or command prompt in the project's root directory and run:
+Open your terminal in the project's root directory and run:
 
 ```bash
-# This creates a .venv folder using Python 3.11
-uv venv --python 3.11 --seed
-```
+# Create the virtual environment
+uv venv
 
----
-
-### 3. Activate the Environment
-
-You must activate the environment in your terminal session before installing packages or running the server.
-
-**On Windows (Command Prompt/PowerShell):**
-```cmd
+# Activate the environment
+# On Windows:
 .venv\Scripts\activate
+# On macOS / Linux:
+# source .venv/bin/activate
 ```
 
-**On macOS / Linux:**
-```bash
-source .venv/bin/activate
-```
+### 3. Install Dependencies
 
-Your terminal prompt should now be prefixed with `(.venv)`.
-
----
-
-### 4. Install Dependencies
-
-Install all required Python packages using the requirements.txt file.
+Install all required Python packages. **Note:** This step will download large AI models for embeddings and TTS, which may take some time.
 
 ```bash
-# This will install FastAPI, PyTorch, ChromaDB, and all other dependencies
 uv pip install -r requirements.txt
 ```
 
-> **Note:** The first time you run this, it may take a few minutes to download the PyTorch libraries and the Sentence Transformer model for the RAG system.
+### 4. Configure the VDM
 
----
+  * **Environment Variables**: Copy `.env.example` to `.env` and fill in any necessary API keys or change the default URLs for your local LLM providers.
+  * **Main Configuration**: Open `settings.yml` to configure the core behavior, especially the `llm` and `memory` sections to select your AI backend and chunking strategy.
+  * **Prompts & Voices (Optional)**: Edit `prompts.yml` to change the GM's personality or `voices.yml` for dynamic voice casting.
 
-### 5. Configure the VDM
+### 5. Launch the Server!
 
-The VDM is configured using simple YAML files.
+Simply run the launch script. It will activate the environment and start the Uvicorn server.
 
-* **Main Configuration:** Copy `config.yml.example` to `config.yml`. Open the new file and configure it, paying special attention to the `llm` section to select your AI backend (`lmstudio`, `ollama`, `openrouter`) and provide your API key if needed.
-* **Prompts (Optional):** Edit `prompts.yml` to change the GM's personality and instructions.
-* **Voices (Optional):** If you enable `enable_dynamic_casting` in your config, edit `voices.yml` to assign custom voices to characters.
-
----
-
-### 6. Generate SSL Certificate (for HTTPS)
-
-The microphone feature requires a secure (HTTPS) connection.
-
-1. **(One-Time Setup) Install a local Certificate Authority:**
-   ```bash
-   mkcert -install
-   ```
-
-2. **Generate Certificate:**  
-   From your project's root directory, create a `ssl` folder. Then run the mkcert command, replacing `<YOUR_IP_HERE>` with your actual local network or ZeroTier IP address.
-
-   ```bash
-   mkdir ssl
-   mkcert -key-file ./ssl/key.pem -cert-file ./ssl/cert.pem localhost 127.0.0.1 ::1 <YOUR_IP_HERE>
-   ```
-
----
-
-### 7. Launch the Server!
-
-Simply run the launch script. It will handle activating the environment and starting the server with all the correct settings.
-
-**On Windows:**
 ```cmd
-launch.bat
+uvicorn server.main:app --reload --reload-dir ./server --reload-dir ./web --host 127.0.0.1 --port 8000
 ```
 
-The server will be running at [https://localhost:8000](https://localhost:8000) (or your configured port). You and your friends can now connect and play!
+The server will be running at `http://127.0.0.1:8000`. You and your friends can now connect and play!
 
 ---
 
 ## 🎮 How to Play
 
-1. **Connect:** Open your browser to the server's HTTPS address. Enter a Room ID and a Player Name.
-2. **Lobby:** Wait for your friends to join. The first player in the room is the host and will see a "Start Game" button.
-3. **Start Game:** The host clicks "Start Game" to begin the collaborative setup.
-4. **Define Your World:** The GM will ask what kind of adventure you want to play. Anyone can reply. The first in-character reply sets the stage for the game.
-5. **Declare Actions:** During gameplay, type what your character does or says. This adds your action to the current turn's queue.
-6. **Submit the Turn:** When all players have declared their actions, anyone can click the "Continue Story" button (or type `/next`) to submit the turn to the GM.
-7. **Enjoy the Story:** The GM will narrate the outcome of your combined actions.
+1. **Connect:** Open your browser to the server's address.  
+2. **Login/Register:** Create a persistent player account.  
+3. **Join a Room:** Enter a Room ID to join or create a game. The first player becomes the room's permanent owner.  
+4. **Start the Game:** The room owner clicks "Start Game" to begin the collaborative setup.  
+5. **Declare Actions:** During gameplay, type or speak what your character does or says. Your action is added to the turn queue.  
+6. **Submit the Turn:** When all players are ready, anyone can click the "Continue Story" button (or type `/next`) to submit the turn to the GM.  
+7. **Enjoy the Story:** The GM will narrate the outcome of your combined actions.  
 
 ---
 

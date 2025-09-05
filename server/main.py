@@ -46,27 +46,21 @@ app.mount("/audio", StaticFiles(directory=Path(settings.paths.audio_out_dir)), n
 
 class ConnectionManager:
     """Manages active WebSocket connections for each room."""
-
     def __init__(self):
         self.connections: Dict[str, Set[WebSocket]] = {}
 
     async def connect(self, room_id: str, websocket: WebSocket):
         await websocket.accept()
         self.connections.setdefault(room_id, set()).add(websocket)
-        logger.info(
-            f"New connection in room '{room_id}'. Total: {len(self.connections[room_id])}"
-        )
+        logger.info(f"New connection in room '{room_id}'. Total: {len(self.connections[room_id])}")
 
     def disconnect(self, room_id: str, websocket: WebSocket):
         if room_id in self.connections:
             self.connections[room_id].discard(websocket)
-            logger.info(
-                f"Disconnected from room '{room_id}'. Remaining: {len(self.connections.get(room_id, set()))}"
-            )
+            logger.info(f"Disconnected from room '{room_id}'. Remaining: {len(self.connections.get(room_id, set()))}")
 
     async def broadcast(self, room_id: str, message: WSOutgoingMessage):
-        if room_id not in self.connections:
-            return
+        if room_id not in self.connections: return
         payload = message.model_dump_json()
         tasks = [
             connection.send_text(payload)
@@ -74,7 +68,6 @@ class ConnectionManager:
             if connection.client_state == WebSocketState.CONNECTED
         ]
         await asyncio.gather(*tasks)
-
 
 # --- Instantiate Managers ---
 db_manager = DatabaseManager(
@@ -88,8 +81,6 @@ story_manager = StoryManager()
 audio_manager = AudioManager()
 game_manager = DiceRoller()
 connection_manager = ConnectionManager()
-
-
 # ===================================================================
 # Core Game Loop Logic
 # ===================================================================
@@ -261,12 +252,8 @@ async def _advance_turn_non_streaming(
 async def _resume_game_turn(room_id: str, player: Player):
     """Resumes a game non-streamed for simplicity."""
     room_state = room_manager.get_room(room_id)
-    if (
-        not room_state
-        or player.id != room_state.host_player_id
-        or room_state.game_state != "PLAYING"
-    ):
-        return
+    # The check for host actions will now happen inside the websocket_endpoint
+    if (not room_state or room_state.game_state != "PLAYING"): return
 
     await connection_manager.broadcast(
         room_id,
@@ -297,39 +284,29 @@ async def _resume_game_turn(room_id: str, player: Player):
         room_id, WSOutgoingMessage(kind="state_update", payload=room_state.model_dump())
     )
 
-
-# ===================================================================
+    # ===================================================================
 # API & WebSocket Endpoints
 # ===================================================================
-
 
 @app.get("/")
 async def get_root():
     return FileResponse(BASE_DIR / "web/index.html")
 
-
 @app.post("/api/register")
 async def register_player(request: RegisterRequest):
-    success, message = user_manager.register_player(
-        request.name, request.avatar_style, request.password
-    )
-    if not success:
-        raise HTTPException(status_code=400, detail=message)
+    success, message = user_manager.register_player(request.name, request.avatar_style, request.password)
+    if not success: raise HTTPException(status_code=400, detail=message)
     return JSONResponse(content={"message": message})
-
 
 @app.post("/api/login")
 async def login_player(request: LoginRequest):
     user_data = user_manager.login(request.name, request.password)
-    if not user_data:
-        raise HTTPException(status_code=401, detail="Invalid username or password.")
+    if not user_data: raise HTTPException(status_code=401, detail="Invalid username or password.")
     return JSONResponse(content=user_data)
-
 
 @app.get("/api/voices")
 async def get_voices():
     return JSONResponse(content=audio_manager.list_voices())
-
 
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():
@@ -349,23 +326,20 @@ async def websocket_endpoint(
     room, player = add_player_result
 
     if room.messages:
-        await websocket.send_text(
-            WSOutgoingMessage(
-                kind="chat_history", payload={"messages": [m.model_dump() for m in room.messages]}
-            ).model_dump_json()
-        )
+        await websocket.send_text(WSOutgoingMessage(kind="chat_history", payload={"messages": [m.model_dump() for m in room.messages]}).model_dump_json())
 
-    if not room.host_player_id:
-        room.host_player_id = player_id
-        logger.info(f"Player '{player.name}' is now the host of room '{room_id}'.")
+    # --- Permanent Owner and Host Logic ---
+    # If the room has no permanent owner, this player becomes the owner.
+    if not room.owner_username:
+        room.owner_username = player.name
+        logger.info(f"Player '{player.name}' is the permanent owner of room '{room_id}'.")
+    
+    # The active host is always the owner, if they are present.
+    if room.owner_username == player.name:
+        room.host_player_id = player.id
 
-    await connection_manager.broadcast(
-        room_id,
-        WSOutgoingMessage(kind="system", payload={"message": f"{player.name} has joined the game!"}),
-    )
-    await connection_manager.broadcast(
-        room_id, WSOutgoingMessage(kind="state_update", payload=room.model_dump())
-    )
+    await connection_manager.broadcast(room_id, WSOutgoingMessage(kind="system", payload={"message": f"{player.name} has joined the game!"}))
+    await connection_manager.broadcast(room_id, WSOutgoingMessage(kind="state_update", payload=room.model_dump()))
 
     try:
         while True:
@@ -373,136 +347,59 @@ async def websocket_endpoint(
             try:
                 msg = WSIncomingMessage.model_validate_json(data)
                 room_state = room_manager.get_room(room_id)
-                if not room_state:
-                    continue
+                if not room_state: continue
+
+                # Check if the current player is the room owner for host actions.
+                is_owner = (room_state.owner_username == player.name)
 
                 if msg.kind == "start_game":
-                    if (
-                        player.id == room_state.host_player_id
-                        and room_state.game_state == "LOBBY"
-                    ):
+                    if is_owner and room_state.game_state == "LOBBY":
                         room_state.game_state = "PLAYING"
-                        
-                        await connection_manager.broadcast(
-                            room_id,
-                            WSOutgoingMessage(
-                                kind="system", payload={"message": "The game is starting..."}
-                            ),
-                        )
+                        await connection_manager.broadcast(room_id, WSOutgoingMessage(kind="system", payload={"message": "The game is starting..."}))
                         await _start_game_setup_turn(room_id)
-
-                        await connection_manager.broadcast(
-                            room_id,
-                            WSOutgoingMessage(
-                                kind="state_update", payload=room_state.model_dump()
-                            ),
-                        )
-
+                        await connection_manager.broadcast(room_id, WSOutgoingMessage(kind="state_update", payload=room_state.model_dump()))
+                
                 elif msg.kind == "resume_game":
-                    await _resume_game_turn(room_id, player)
+                    if is_owner:
+                        await _resume_game_turn(room_id, player)
 
                 elif msg.kind == "submit_turn":
                     await _advance_turn(room_id, player)
 
                 elif msg.kind == "say":
                     text = msg.payload.get("message", "").strip()
-                    if not text:
-                        continue
-
-                    is_command = text.startswith("/")
-                    if is_command:
-                        parts = text.split()
-                        cmd = parts[0].lower()
+                    if not text: continue
+                    if text.startswith("/"):
+                        parts = text.split(); cmd = parts[0].lower()
                         if cmd == "/roll":
                             notation = parts[1] if len(parts) > 1 else "1d20"
                             result = game_manager.roll(notation)
                             if result:
-                                roll_msg = room_manager.add_message(
-                                    room_id,
-                                    player.id,
-                                    player.name,
-                                    f"rolls {result.as_string}",
-                                )
-                                await connection_manager.broadcast(
-                                    room_id,
-                                    WSOutgoingMessage(
-                                        kind="chat",
-                                        payload={
-                                            **roll_msg.model_dump(),
-                                            "is_roll": True,
-                                        },
-                                    ),
-                                )
+                                roll_msg = room_manager.add_message(room_id, player.id, player.name, f"rolls {result.as_string}")
+                                await connection_manager.broadcast(room_id, WSOutgoingMessage(kind="chat", payload={**roll_msg.model_dump(), "is_roll": True,}))
                         elif cmd == "/save":
                             room_manager.save_room_state(room_id)
-                            await connection_manager.broadcast(
-                                room_id,
-                                WSOutgoingMessage(
-                                    kind="system",
-                                    payload={
-                                        "message": f"Game progress saved by {player.name}."
-                                    },
-                                ),
-                            )
+                            await connection_manager.broadcast(room_id, WSOutgoingMessage(kind="system", payload={"message": f"Game progress saved by {player.name}."}))
                         elif cmd == "/remember":
                             memory_text = " ".join(parts[1:])
                             if memory_text:
-                                story_manager.memory_manager.add_memory(
-                                    room_id, memory_text
-                                )
-                                await connection_manager.broadcast(
-                                    room_id,
-                                    WSOutgoingMessage(
-                                        kind="system",
-                                        payload={
-                                            "message": f"{player.name} added a memory: '{memory_text[:50]}...'"
-                                        },
-                                    ),
-                                )
+                                story_manager.memory_manager.add_memory(room_id, memory_text)
+                                await connection_manager.broadcast(room_id, WSOutgoingMessage(kind="system", payload={"message": f"{player.name} added a memory: '{memory_text[:50]}...'" }))
                         elif cmd == "/next":
                             await _advance_turn(room_id, player)
                         elif cmd == "/ooc":
                             ooc_text = " ".join(parts[1:])
                             if ooc_text:
-                                ooc_msg = room_manager.add_message(
-                                    room_id, player.id, player.name, f"// {ooc_text}"
-                                )
-                                await connection_manager.broadcast(
-                                    room_id,
-                                    WSOutgoingMessage(
-                                        kind="chat",
-                                        payload={
-                                            **ooc_msg.model_dump(),
-                                            "is_ooc": True,
-                                        },
-                                    ),
-                                )
+                                ooc_msg = room_manager.add_message(room_id, player.id, player.name, f"// {ooc_text}")
+                                await connection_manager.broadcast(room_id, WSOutgoingMessage(kind="chat", payload={**ooc_msg.model_dump(), "is_ooc": True, }))
                         else:
-                            await websocket.send_text(
-                                WSOutgoingMessage(
-                                    kind="system",
-                                    payload={"message": f"Unknown command: {cmd}"},
-                                ).model_dump_json()
-                            )
+                            await websocket.send_text(WSOutgoingMessage(kind="system", payload={"message": f"Unknown command: {cmd}"}).model_dump_json())
                     else:
-                        if room_state.turn_state == "GM_PROCESSING":
-                            continue
+                        if room_state.turn_state == "GM_PROCESSING": continue
                         room_state.current_turn_actions[player.id] = text
-                        action_msg = room_manager.add_message(
-                            room_id, player.id, player.name, text
-                        )
-                        await connection_manager.broadcast(
-                            room_id,
-                            WSOutgoingMessage(
-                                kind="chat", payload=action_msg.model_dump()
-                            ),
-                        )
-                        await connection_manager.broadcast(
-                            room_id,
-                            WSOutgoingMessage(
-                                kind="state_update", payload=room_state.model_dump()
-                            ),
-                        )
+                        action_msg = room_manager.add_message(room_id, player.id, player.name, text)
+                        await connection_manager.broadcast(room_id, WSOutgoingMessage(kind="chat", payload=action_msg.model_dump()))
+                        await connection_manager.broadcast(room_id, WSOutgoingMessage(kind="state_update", payload=room_state.model_dump()))
             except Exception:
                 logger.error(f"Error processing message from {player.name}", exc_info=True)
 
@@ -511,28 +408,14 @@ async def websocket_endpoint(
         disconnected_player = room_manager.remove_player(room_id, player_id)
         if disconnected_player and (room_state := room_manager.get_room(room_id)):
             room_state.current_turn_actions.pop(player_id, None)
+            
+            # If the disconnecting player was the host, clear the temporary host ID.
             if room_state.host_player_id == player_id:
-                new_host_id = next(
-                    (pid for pid, p in room_state.players.items() if p.is_active), None
-                )
-                room_state.host_player_id = new_host_id
-                if new_host_id:
-                    new_host_name = room_state.players[new_host_id].name
-                    await connection_manager.broadcast(
-                        room_id,
-                        WSOutgoingMessage(
-                            kind="system",
-                            payload={
-                                "message": f"The host has left. {new_host_name} is the new host."
-                            },
-                        ),
-                    )
+                room_state.host_player_id = None
+            
             await connection_manager.broadcast(
                 room_id,
-                WSOutgoingMessage(
-                    kind="system",
-                    payload={"message": f"{disconnected_player.name} has left the game."},
-                ),
+                WSOutgoingMessage(kind="system", payload={"message": f"{disconnected_player.name} has left the game."}),
             )
             await connection_manager.broadcast(
                 room_id,

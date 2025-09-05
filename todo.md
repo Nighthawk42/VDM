@@ -18,3 +18,11 @@ This document tracks major functional, operational, and architectural improvemen
 
 - **[ ] Create a `Dockerfile`:** Define the environment for the VDM server, including the Python version, dependency installation from `requirements.txt`, and the command to run the server.
 - **[ ] Create a `docker-compose.yml`:** Write a Compose file to make it trivial to start the entire application stack (the VDM server and potentially its databases) with a single `docker-compose up` command. This dramatically simplifies setup for new developers and production environments.
+
+## 3. Modern Frontend Framework Migration
+
+**Goal:** Rebuild the frontend using a modern JavaScript framework to improve scalability, maintainability, and the developer experience.
+
+- **[ ] Choose a Framework:** Evaluate and select a framework. **React** (with Vite for the build tool) is a strong contender due to its vast ecosystem and component-based architecture, which is a perfect fit for our UI.
+- **[ ] Component-Based Refactoring:** Break down the existing HTML and JavaScript into reusable components (e.g., `ChatLog`, `PlayerList`, `MessageInput`).
+- **[ ] State Management:** Replace the current manual state object with a dedicated state management library like **Zustand** or **Redux Toolkit** for a more robust and predictable UI.

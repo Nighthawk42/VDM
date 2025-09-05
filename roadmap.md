@@ -51,4 +51,3 @@ This section lists larger, more complex systems to be considered after the curre
 
 #### Operational Excellence
 - **Docker Support**: Containerize the entire application with a `Dockerfile` and `docker-compose.yml` for easy, one-command deployment.
-- **Automated Testing**: Build a test suite using `pytest` to ensure code quality and prevent regressions.

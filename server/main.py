@@ -331,6 +331,11 @@ async def get_voices():
     return JSONResponse(content=audio_manager.list_voices())
 
 
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    return FileResponse(BASE_DIR / "web/favicon.ico")
+
+
 @app.websocket("/ws/{room_id}/{player_id}/{player_token}")
 async def websocket_endpoint(
     websocket: WebSocket, room_id: str, player_id: str, player_token: str
@@ -502,7 +507,6 @@ async def websocket_endpoint(
                 logger.error(f"Error processing message from {player.name}", exc_info=True)
 
     except WebSocketDisconnect:
-        # FIXED: This no longer logs the user out, it just disconnects them from the room.
         connection_manager.disconnect(room_id, websocket)
         disconnected_player = room_manager.remove_player(room_id, player_id)
         if disconnected_player and (room_state := room_manager.get_room(room_id)):

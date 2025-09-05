@@ -33,8 +33,13 @@ class AudioSettings(BaseModel):
     default_voice: str
 
 class MemorySettings(BaseModel):
+    """
+    Settings for memory and database persistence.
+    UPDATED: Now includes separate paths for user and session databases.
+    """
     embedding_model: str
-    database_file: str
+    sessions_db_file: str # Path to the sessions/rooms database.
+    users_db_file: str    # Path to the users/accounts database.
 
 class PathsSettings(BaseModel):
     prompts_file: str

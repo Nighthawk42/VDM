@@ -33,6 +33,10 @@ export function initApi(state, ui) {
                 case 'chat': // Non-streamed complete message
                     ui.logMessage('chat', msg.payload);
                     break;
+                // NEW: Handle the batch of historical messages upon joining.
+                case 'chat_history':
+                    ui.loadChatHistory(msg.payload.messages);
+                    break;
                 case 'audio': // Non-streamed complete audio file
                     ui.playAudioFile(msg.payload.url);
                     break;

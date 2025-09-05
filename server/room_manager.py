@@ -3,29 +3,41 @@ from typing import Dict, Optional, Tuple
 
 from .models import Room, Player, ChatMessage
 from .logger import logger
-# REMOVED: from .persistence_manager import PersistenceManager
 from .user_manager import UserManager
+from .persistence_manager import PersistenceManager
 
 class RoomManager:
     """Manages the state of all active VDM rooms in memory."""
 
-    def __init__(self, user_manager: UserManager):
-        """Initializes the RoomManager with its dependencies."""
-        from .persistence_manager import PersistenceManager # <-- FIX: Import moved inside __init__
-        
+    def __init__(self, user_manager: UserManager, persistence_manager: PersistenceManager):
+        """
+        Initializes the RoomManager with its dependencies.
+
+        Args:
+            user_manager: An active instance of the UserManager.
+            persistence_manager: An active instance of the PersistenceManager.
+        """
         self._rooms: Dict[str, Room] = {}
-        self._persistence_manager = PersistenceManager()
+        self._persistence_manager = persistence_manager
         self._user_manager = user_manager
 
     def get_or_create_room(self, room_id: str) -> Room:
         """
-        Retrieves a room by its ID, loading from a session file if available.
+        Retrieves a room by its ID from memory, or loads it from persistence.
+        If not found, a new empty room is created.
+
+        Args:
+            room_id: The unique identifier for the room.
+
+        Returns:
+            The active Room object.
         """
         if room_id in self._rooms:
             return self._rooms[room_id]
 
         loaded_room = self._persistence_manager.load_room(room_id)
         if loaded_room:
+            # When loading a room, mark all players as inactive until they reconnect.
             for player in loaded_room.players.values():
                 player.is_active = False
             self._rooms[room_id] = loaded_room
@@ -37,7 +49,7 @@ class RoomManager:
         return new_room
 
     def save_room_state(self, room_id: str):
-        """A convenience method to trigger saving a room's state."""
+        """A convenience method to trigger saving a room's state via the persistence manager."""
         if room_id in self._rooms:
             self._persistence_manager.save_room(self._rooms[room_id])
         else:
@@ -45,7 +57,16 @@ class RoomManager:
 
     def add_player(self, room_id: str, player_id: str, player_token: str) -> Optional[Tuple[Room, Player]]:
         """
-        Adds or reactivates a player in a room using their auth token.
+        Adds a player to a room or reactivates them if they are rejoining.
+        Validates the player's session token.
+
+        Args:
+            room_id: The ID of the room to join.
+            player_id: The client-generated unique ID for the player's connection.
+            player_token: The session token obtained during login.
+
+        Returns:
+            A tuple of (Room, Player) if successful, otherwise None.
         """
         player_data = self._user_manager.get_user_by_token(player_token)
         if not player_data:
@@ -53,38 +74,27 @@ class RoomManager:
             return None
 
         room = self.get_or_create_room(room_id)
-        player_name = player_data["name"]
+        player_name = player_data["username_cased"] # Use the cased name from DB
 
+        # Check if this player (by name) is already in the room state
         existing_player: Optional[Player] = None
-        old_player_id: Optional[str] = None
-        for pid, p in room.players.items():
+        for p in room.players.values():
             if p.name.lower() == player_name.lower():
                 existing_player = p
-                old_player_id = pid
                 break
-
+        
         if existing_player:
-            if existing_player.is_active:
-                logger.warning(f"Player '{player_name}' tried to join room '{room_id}' but is already active.")
-                # Allow rejoining for simplicity, just update their ID.
-                # This handles cases where a client disconnects without the server knowing.
-            
             logger.info(f"Player '{player_name}' is reconnecting to room '{room_id}'.")
-            if old_player_id and old_player_id in room.players:
-                # Remove the old entry if the client ID has changed (e.g., new browser tab)
-                if old_player_id != player_id:
-                    del room.players[old_player_id]
-            
-            existing_player.id = player_id
             existing_player.is_active = True
+            # Update ID and avatar in case they changed or are logging in from a new client
+            existing_player.id = player_id 
             existing_player.avatar_style = player_data["avatar_style"]
-            room.players[player_id] = existing_player
             return room, existing_player
         
         logger.info(f"Player '{player_name}' ({player_id}) joined room '{room_id}' for the first time.")
         new_player = Player(
             id=player_id, 
-            name=player_data["name"], 
+            name=player_name, 
             avatar_style=player_data["avatar_style"],
             is_active=True
         )
@@ -93,13 +103,23 @@ class RoomManager:
 
     def remove_player(self, room_id: str, player_id: str) -> Optional[Player]:
         """
-        Deactivates a player in a room, preserving their data.
+        Deactivates a player in a room, preserving their data for reconnection.
+        If the last active player leaves, the room state is saved.
+
+        Args:
+            room_id: The ID of the room the player is leaving.
+            player_id: The ID of the player's connection.
+
+        Returns:
+            The Player object that was deactivated, or None if not found.
         """
         room = self._rooms.get(room_id)
         if room and player_id in room.players:
             player = room.players[player_id]
             player.is_active = False
             logger.info(f"Player '{player.name}' ({player_id}) disconnected from room '{room_id}'.")
+            
+            # If this was the last active player, save the game state.
             if not any(p.is_active for p in room.players.values()):
                 logger.info(f"Last active player left room '{room_id}'. Saving state.")
                 self.save_room_state(room_id)
@@ -115,7 +135,10 @@ class RoomManager:
         audio_url: Optional[str] = None
     ) -> ChatMessage:
         """
-        Adds a chat message to a room's history, optionally with an audio URL.
+        Adds a chat message to a room's history.
+
+        Returns:
+            The created ChatMessage object.
         """
         room = self.get_or_create_room(room_id)
         message = ChatMessage(

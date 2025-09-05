@@ -64,9 +64,11 @@ memory:
   # long-term memory (RAG). This runs locally.
   embedding_model: "sentence-transformers/all-MiniLM-L6-v2"
 
-  # The file path for the SQLite database where all game sessions, players,
-  # and messages are saved.
-  database_file: "./memory/vdm_sessions.db"
+  # UPDATED: Split database paths for better organization.
+  # The database for saving game room/session states.
+  sessions_db_file: "./database/vdm_sessions.db"
+  # The database for saving user accounts and profiles.
+  users_db_file: "./database/vdm_users.db"
 
 
 # === SECTION: Resource Paths ==================================================
@@ -75,7 +77,7 @@ memory:
 paths:
   # Path to the YAML file containing all AI system prompts.
   prompts_file: "./prompts.yml"
-  
+
   # Path to the YAML file that maps character names to specific voices for
   # the Dynamic Voice Casting feature.
   voices_file: "./voices.yml"

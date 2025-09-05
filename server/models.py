@@ -8,12 +8,14 @@ from typing import Dict, List, Literal, Any, Optional
 # These Pydantic models define the structure of our application's state.
 
 class Player(BaseModel):
+    """Represents a player within a game room."""
     id: str
     name: str
     avatar_style: str = "adventurer"
     is_active: bool = True
 
 class ChatMessage(BaseModel):
+    """Represents a single message in the chat history."""
     author_id: str
     author_name: str
     content: str
@@ -21,6 +23,7 @@ class ChatMessage(BaseModel):
     is_ooc: bool = False
 
 class Room(BaseModel):
+    """Represents the entire state of a single game room."""
     room_id: str
     players: Dict[str, Player] = Field(default_factory=dict)
     messages: List[ChatMessage] = Field(default_factory=list)
@@ -30,19 +33,20 @@ class Room(BaseModel):
     host_player_id: Optional[str] = None
 
 class RegisterRequest(BaseModel):
+    """Model for the /api/register endpoint payload."""
     name: str
     avatar_style: str
     password: str
 
 class LoginRequest(BaseModel):
+    """Model for the /api/login endpoint payload."""
     name: str
     password: str
 
 # ===================================================================
 # WebSocket Protocol Models
 # ===================================================================
-# These models define the contract for messages sent between the
-# server and the clients over the WebSocket connection.
+# These models define the contract for messages sent over the WebSocket.
 
 class WSIncomingMessage(BaseModel):
     """A message received from a client."""
@@ -64,6 +68,7 @@ class WSOutgoingMessage(BaseModel):
         "stream_start",
         "chat_chunk",
         "audio_chunk",
-        "stream_end"
+        "stream_end",
+        "chat_history"
     ]
     payload: Dict[str, Any]

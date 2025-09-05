@@ -9,7 +9,8 @@ import { initAudio } from './audio.js';
 /**
  * @typedef {object} AppUI - The public interface of the UI module.
  * @property {(api: ReturnType<ApiModule>) => void} setApi
- * @property {(type: string, data: any) => void} logMessage
+ * @property {(type: string, data: any, isBatch: boolean) => void} logMessage
+ * @property {(messages: any[]) => void} loadChatHistory
  * @property {(room: any) => void} updateRoomState
  * @property {(url: string) => void} playAudioFile
  * @property {() => void} handleStreamStart
@@ -23,10 +24,20 @@ import { initAudio } from './audio.js';
 
 // List of available avatar styles.
 const AVATAR_STYLES = [
-    "adventurer", "adventurer-neutral", "avataaars", "big-ears", "big-smile", 
-    "bottts", "croodles", "fun-emoji", "icons", "identicon", "initials", 
+    "adventurer", "adventurer-neutral", "avataaars", "big-ears", "big-smile",    
+    "bottts", "croodles", "fun-emoji", "icons", "identicon", "initials",    
     "lorelei", "micah", "miniavs", "open-peeps", "personas", "pixel-art", "rings"
 ];
+
+// NEW: Define available slash commands for the previewer.
+const COMMANDS = {
+    "/roll": "[dice] - Rolls dice (e.g., 2d6+3). Defaults to 1d20.",
+    "/ooc": "[message] - Sends an out-of-character message.",
+    "/remember": "[fact] - Saves a fact to the GM's long-term memory.",
+    "/save": "- Saves the current game session.",
+    "/next": "- Submits the current turn actions to the GM."
+};
+
 
 /**
  * Initializes and returns the UI module.
@@ -84,6 +95,7 @@ export function initUI(state) {
         sendButton: document.getElementById('send-button'),
         resolveButton: document.getElementById('resolve-button'),
         gmThinkingIndicator: document.getElementById('gm-thinking-indicator'),
+        commandPreview: document.getElementById('command-preview'), // Command preview element
         themeToggle: document.getElementById('theme-toggle'),
     };
 
@@ -94,16 +106,12 @@ export function initUI(state) {
     /** Main render function to switch between primary UI views */
     function _render() {
         const mainElement = document.querySelector('main');
-
-        // Hide all view containers initially
         dom.loginView.style.display = 'none';
         dom.registerView.style.display = 'none';
         dom.mainAppView.style.display = 'none';
 
-        // Set a class on the <main> element to control the overall layout via CSS
         if (state.uiView === 'login' || state.uiView === 'register') {
             mainElement.className = 'auth-mode';
-            // Show the correct auth form
             if (state.uiView === 'login') {
                 dom.loginView.style.display = 'flex';
             } else {
@@ -113,7 +121,6 @@ export function initUI(state) {
             mainElement.className = 'app-mode';
             dom.mainAppView.style.display = 'flex';
 
-            // This logic to show/hide sections within the app remains the same
             if (state.playerInfo) {
                 dom.playerIdentity.style.display = 'flex';
                 dom.playerCardName.textContent = state.playerInfo.name;
@@ -131,6 +138,27 @@ export function initUI(state) {
             }
         }
     }
+    
+    /** NEW: Updates the command preview based on input */
+    function _updateCommandPreview() {
+        const text = dom.messageInput.value;
+        if (text.startsWith('/')) {
+            const [typedCmd] = text.split(' ');
+            let html = '<h4>Commands</h4><ul>';
+            for (const [cmd, desc] of Object.entries(COMMANDS)) {
+                if (cmd.startsWith(typedCmd)) {
+                    html += `<li><strong>${cmd}</strong>: ${desc}</li>`;
+                }
+            }
+            html += '</ul>';
+            dom.commandPreview.innerHTML = html;
+            dom.commandPreview.style.display = 'block';
+        } else {
+            dom.commandPreview.style.display = 'none';
+        }
+    }
+
+    // --- Other private functions (_updateAvatarSelectionUI, _populateAvatarGrid, etc. are unchanged) ---
 
     function _updateAvatarSelectionUI() {
         const name = dom.registerNameInput.value.trim() || 'player';
@@ -167,7 +195,7 @@ export function initUI(state) {
 
     /** Attach all event listeners for the application */
     function _attachListeners() {
-        // --- Auth Listeners ---
+        // --- Auth & Connection Listeners (mostly unchanged) ---
         dom.switchToRegisterBtn.addEventListener('click', () => { state.uiView = 'register'; _render(); });
         dom.switchToLoginBtn.addEventListener('click', () => { state.uiView = 'login'; _render(); });
 
@@ -177,12 +205,10 @@ export function initUI(state) {
             const name = dom.registerNameInput.value.trim();
             const password = dom.registerPasswordInput.value;
             const confirm = dom.registerConfirmPasswordInput.value;
-
             if (password !== confirm) {
                 _showError(dom.registerError, "Passwords do not match.");
                 return;
             }
-
             const result = await api.register(name, state.selectedAvatarStyle, password);
             if (result.success) {
                 alert(result.message);
@@ -199,7 +225,6 @@ export function initUI(state) {
             const name = dom.loginNameInput.value.trim();
             const password = dom.loginPasswordInput.value;
             const result = await api.login(name, password);
-
             if (result.success) {
                 state.playerInfo = result.data;
                 localStorage.setItem('vdm-player', JSON.stringify(result.data));
@@ -209,10 +234,15 @@ export function initUI(state) {
                 _showError(dom.loginError, result.message);
             }
         });
-
+        
         dom.logoutButton.addEventListener('click', () => api.logout());
+        dom.joinButton.addEventListener('click', () => {
+            const roomId = dom.roomIdInput.value.trim();
+            if (roomId) api.connectToRoom(roomId);
+        });
+        dom.leaveButton.addEventListener('click', () => api.disconnect());
 
-        // --- Avatar Selection ---
+        // --- Avatar Selection Listeners (unchanged) ---
         dom.registerNameInput.addEventListener('input', () => _updateAvatarSelectionUI());
         dom.avatarSelectionGrid.addEventListener('click', (e) => {
             const option = e.target.closest('.avatar-option');
@@ -222,39 +252,34 @@ export function initUI(state) {
             }
         });
 
-        // --- Connection Listeners ---
-        dom.joinButton.addEventListener('click', () => {
-            const roomId = dom.roomIdInput.value.trim();
-            if (roomId) api.connectToRoom(roomId);
-        });
-        dom.leaveButton.addEventListener('click', () => api.disconnect());
-
         // --- Chat Listeners ---
         dom.sendButton.addEventListener('click', () => {
             const message = dom.messageInput.value.trim();
             if (message) api.sendMessage('say', { message });
             dom.messageInput.value = '';
+            _updateCommandPreview();
             dom.messageInput.focus();
         });
+
         dom.messageInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 dom.sendButton.click();
             }
         });
+        // NEW: Add input event listener for command preview
+        dom.messageInput.addEventListener('input', _updateCommandPreview);
+
         dom.resolveButton.addEventListener('click', () => api.sendMessage('submit_turn'));
-        
-        // --- Host Listeners ---
         dom.startGameButton.addEventListener('click', () => api.sendMessage('start_game'));
         dom.resumeGameButton.addEventListener('click', () => api.sendMessage('resume_game'));
 
-        // --- Misc Listeners ---
+        // --- Misc Listeners (unchanged) ---
         dom.themeToggle.addEventListener('click', () => {
             const isLight = document.body.classList.toggle('light-theme');
             localStorage.setItem('vdm-theme', isLight ? 'light' : 'dark');
         });
 
-        // Resume AudioContext on any user interaction
         const resumeAudio = () => {
             if (state.audioContext && state.audioContext.state === 'suspended') {
                 state.audioContext.resume();
@@ -269,9 +294,8 @@ export function initUI(state) {
     document.body.classList.toggle('light-theme', savedTheme === 'light');
     _populateAvatarGrid();
     _attachListeners();
-    _render(); // Set the initial view based on loaded state
+    _render(); // Set initial view
 
-    // --- Public UI Methods ---
     /** @type {AppUI} */
     const publicInterface = {
         setApi(apiModule) {
@@ -281,7 +305,6 @@ export function initUI(state) {
         logMessage(type, data, isBatch = false) {
             const msgDiv = document.createElement('div');
             msgDiv.classList.add('msg', type);
-
             if (type === 'system') {
                 msgDiv.textContent = data.message;
             } else if (type === 'chat') {
@@ -313,17 +336,28 @@ export function initUI(state) {
                 msgDiv.appendChild(avatarImg);
                 msgDiv.appendChild(contentDiv);
             }
-            
             dom.chatLog.appendChild(msgDiv);
             if (!isBatch) {
                 dom.chatLog.scrollTop = dom.chatLog.scrollHeight;
             }
         },
+        
+        // NEW: Function to load historical messages
+        loadChatHistory(messages) {
+            dom.chatLog.innerHTML = ''; // Clear the chat log first
+            messages.forEach(msg => {
+                // The 'chat' type is hardcoded as only chat messages are in history
+                this.logMessage('chat', msg, true);
+            });
+            dom.chatLog.scrollTop = dom.chatLog.scrollHeight; // Scroll to bottom after batch rendering
+        },
 
+        // --- Other public methods (updateRoomState, streaming handlers, etc.) are mostly unchanged ---
+        
         updateRoomState(room) {
             state.room = room;
             dom.roomName.textContent = room.room_id;
-            dom.playerList.innerHTML = ''; // Clear previous list
+            dom.playerList.innerHTML = '';
             
             Object.values(room.players).forEach(player => {
                 const playerLi = document.createElement('li');
@@ -352,8 +386,7 @@ export function initUI(state) {
                 dom.playerList.appendChild(playerLi);
             });
             
-            // Update UI based on game state
-            const isHost = (room.host_player_id === state.clientId);
+            const isHost = (state.playerInfo && room.host_player_id === state.playerInfo.id);
             const inLobby = room.game_state === "LOBBY";
             const gmIsProcessing = room.turn_state === "GM_PROCESSING";
             const actionsExist = Object.keys(room.current_turn_actions || {}).length > 0;
@@ -367,10 +400,8 @@ export function initUI(state) {
             dom.sendButton.disabled = gmIsProcessing || inLobby;
         },
 
-        // --- View Changers ---
         showRoomView(roomId) {
             state.isConnected = true;
-            state.room = { room_id: roomId, players: {} }; // temporary state
             _render();
         },
         showConnectionView() {
@@ -379,10 +410,11 @@ export function initUI(state) {
         },
         showLoginView() {
             state.uiView = 'login';
+            state.isConnected = false;
+            state.playerInfo = null; // Ensure player info is cleared
             _render();
         },
 
-        // --- Streaming Handlers ---
         handleStreamStart() {
             const msgDiv = document.createElement('div');
             msgDiv.classList.add('msg', 'chat', 'gm', 'streaming');
@@ -406,7 +438,6 @@ export function initUI(state) {
                 messageElement: msgDiv,
                 contentElement: messageSpan,
             };
-
             audio.startStream();
         },
 

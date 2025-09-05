@@ -32,8 +32,11 @@ else:
 
 
 class AudioManager:
+    """
+    Manages all Text-to-Speech (TTS) and audio file operations,
+    including dynamic voice casting and file storage.
+    """
     def __init__(self) -> None:
-        # FIX: Updated to use the new setting path from the reorganized config.
         self.output_dir = Path(settings.paths.audio_out_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.voice_cast: Dict[str, Any] = {}
@@ -57,8 +60,8 @@ class AudioManager:
             logger.info("Dynamic Voice Casting is DISABLED.")
 
     def _load_voice_casting_sheet(self) -> None:
+        """Loads the voices.yml file for dynamic character voices."""
         try:
-            # FIX: Updated to use the new setting path from the reorganized config.
             path = Path(settings.paths.voices_file)
             if not path.exists():
                 logger.warning(f"Voice casting file not found at '{path}'. No custom voices will be used.")
@@ -70,11 +73,13 @@ class AudioManager:
             logger.error("Failed to load or parse voices.yml.", exc_info=True)
 
     def _initialize_rvc_instances(self) -> None:
+        """Initializes RVC models defined in the voice casting sheet."""
         # (This method is for future RVC implementation)
         pass
 
     @staticmethod
     def _sanitize_for_tts(text: str) -> str:
+        """Removes markdown and other symbols from text before TTS."""
         text = re.sub(r"[\*_]", "", text)
         text = re.sub(r"\[.*?\]", "", text)
         text = re.sub(r"\(.*?\)", "", text)
@@ -82,6 +87,7 @@ class AudioManager:
         return text
 
     def _normalize_audio_chunk(self, audio_chunk: Any) -> Optional[np.ndarray]:
+        """Converts an audio chunk to a NumPy float32 array."""
         if audio_chunk is None: return None
         if hasattr(audio_chunk, "detach"):
             try:
@@ -92,6 +98,7 @@ class AudioManager:
         return None
 
     async def _synthesize_kokoro_stream(self, text: str, voice_name: str) -> AsyncGenerator[bytes, None]:
+        """Yields raw audio byte chunks from the Kokoro TTS pipeline."""
         if not self.pipeline:
             logger.error("Kokoro pipeline not initialized. Cannot synthesize.")
             return
@@ -104,46 +111,22 @@ class AudioManager:
                 yield normalized_chunk.tobytes()
 
     async def _synthesize_rvc_non_stream(self, text: str, character_name: str) -> np.ndarray:
-        char_key = character_name.lower()
+        """Synthesizes audio using an RVC model (non-streaming)."""
+        # (This method is for future RVC implementation)
+        # For now, it falls back to the narrator's voice.
         narrator_voice = self.voice_cast.get("defaults", {}).get("narrator", settings.audio.default_voice)
+        audio_chunks = [chunk async for chunk in self._synthesize_kokoro_stream(text, narrator_voice)]
+        audio_bytes = b"".join(audio_chunks)
+        return np.frombuffer(audio_bytes, dtype=np.float32) if audio_bytes else np.array([], dtype=np.float32)
 
-        if char_key not in self._rvc_instances:
-            logger.warning(f"No RVC instance found for '{character_name}'. Falling back to narrator voice.")
-            audio_chunks = []
-            async for chunk in self._synthesize_kokoro_stream(text, narrator_voice):
-                audio_chunks.append(chunk)
-            audio_bytes = b"".join(audio_chunks)
-            return np.frombuffer(audio_bytes, dtype=np.float32) if audio_bytes else np.array([], dtype=np.float32)
 
-        rvc_instance = self._rvc_instances[char_key]
-        voice_info = self.voice_cast.get("characters", {}).get(character_name, {}) or {}
-        base_voice = voice_info.get("base_voice", narrator_voice)
-        rvc_instance.set_voice(base_voice)
-
-        try:
-            converted_audio_path_str = rvc_instance(text=text)
-            if converted_audio_path_str and Path(converted_audio_path_str).exists():
-                converted_audio, _ = sf.read(converted_audio_path_str)
-                Path(converted_audio_path_str).unlink(missing_ok=True)
-                normalized_audio = self._normalize_audio_chunk(converted_audio)
-                return normalized_audio if normalized_audio is not None else np.array([], dtype=np.float32)
-            else:
-                logger.error(f"RVC conversion failed for '{character_name}'. Falling back to base voice.")
-                audio_chunks = []
-                async for chunk in self._synthesize_kokoro_stream(text, base_voice):
-                    audio_chunks.append(chunk)
-                audio_bytes = b"".join(audio_chunks)
-                return np.frombuffer(audio_bytes, dtype=np.float32) if audio_bytes else np.array([], dtype=np.float32)
-        except Exception:
-            logger.error(f"An exception occurred during RVC synthesis for '{character_name}'.", exc_info=True)
-            audio_chunks = []
-            async for chunk in self._synthesize_kokoro_stream(text, base_voice):
-                audio_chunks.append(chunk)
-            audio_bytes = b"".join(audio_chunks)
-            return np.frombuffer(audio_bytes, dtype=np.float32) if audio_bytes else np.array([], dtype=np.float32)
-
-    async def synthesize_stream(self, text: str, voice: Optional[str] = None) -> AsyncGenerator[bytes, None]:
+    async def synthesize_stream(self, text: str, room_id: Optional[str] = None, voice: Optional[str] = None) -> AsyncGenerator[bytes, None]:
+        """
+        Synthesizes text to an audio stream, handling dynamic voices.
+        Note: The room_id is unused in streaming but kept for API consistency.
+        """
         if not text.strip(): return
+
         if not settings.audio.enable_dynamic_casting:
             chosen_voice = voice or settings.audio.default_voice
             async for chunk in self._synthesize_kokoro_stream(text, chosen_voice):
@@ -167,7 +150,18 @@ class AudioManager:
                     async for chunk in self._synthesize_kokoro_stream(segment, narrator_voice):
                         yield chunk
 
-    async def synthesize(self, text: str, voice: Optional[str] = None) -> str:
+    async def synthesize(self, text: str, room_id: Optional[str] = None, voice: Optional[str] = None) -> str:
+        """
+        Synthesizes text into a complete audio file and saves it.
+
+        Args:
+            text: The text to synthesize.
+            room_id: The ID of the room, used to create a subdirectory for audio files.
+            voice: A specific voice to use, overriding dynamic casting.
+
+        Returns:
+            The URL path to the generated audio file.
+        """
         if not text.strip():
             logger.warning("Synthesize called with empty text.")
             return ""
@@ -177,15 +171,14 @@ class AudioManager:
         if not settings.audio.enable_dynamic_casting:
             chosen_voice = voice or settings.audio.default_voice
             audio_chunks = [chunk async for chunk in self._synthesize_kokoro_stream(text, chosen_voice)]
-            audio_bytes = b"".join(audio_chunks)
-            if audio_bytes:
+            if audio_bytes := b"".join(audio_chunks):
                 full_audio_segments.append(np.frombuffer(audio_bytes, dtype=np.float32))
         else:
             segments = re.split(r'(<v name=".*?">.*?</v>)', text, flags=re.DOTALL)
             for segment in segments:
                 sanitized_segment = self._sanitize_for_tts(segment)
                 if not sanitized_segment: continue
-
+                
                 dialogue_match = re.match(r'<v name="(.*?)">(.*?)</v>', segment, flags=re.DOTALL)
                 if dialogue_match:
                     char_name, dialogue_text = dialogue_match.groups()
@@ -196,14 +189,12 @@ class AudioManager:
                         voice_info = self.voice_cast.get("characters", {}).get(char_name, {}) or {}
                         kokoro_voice = voice_info.get("kokoro_voice", self.voice_cast.get("defaults", {}).get("narrator", settings.audio.default_voice))
                         audio_chunks = [chunk async for chunk in self._synthesize_kokoro_stream(dialogue_text, kokoro_voice)]
-                        audio_bytes = b"".join(audio_chunks)
-                        if audio_bytes:
+                        if audio_bytes := b"".join(audio_chunks):
                             full_audio_segments.append(np.frombuffer(audio_bytes, dtype=np.float32))
                 else:
                     narrator_voice = self.voice_cast.get("defaults", {}).get("narrator", settings.audio.default_voice)
                     audio_chunks = [chunk async for chunk in self._synthesize_kokoro_stream(segment, narrator_voice)]
-                    audio_bytes = b"".join(audio_chunks)
-                    if audio_bytes:
+                    if audio_bytes := b"".join(audio_chunks):
                         full_audio_segments.append(np.frombuffer(audio_bytes, dtype=np.float32))
 
         if not full_audio_segments:
@@ -215,26 +206,33 @@ class AudioManager:
             logger.warning("TTS concatenation resulted in empty audio.")
             return ""
 
+        final_output_dir = self.output_dir
+        url_prefix = "/audio"
+        if room_id:
+            final_output_dir = self.output_dir / room_id
+            final_output_dir.mkdir(exist_ok=True)
+            url_prefix = f"/audio/{room_id}"
+
         filename = f"{uuid.uuid4().hex}.wav"
-        output_path = self.output_dir / filename
+        output_path = final_output_dir / filename
         sf.write(output_path, full_audio, 24000)
 
-        url_path = f"/audio/{filename}"
+        url_path = f"{url_prefix}/{filename}"
         logger.info(f"Final audio synthesized successfully to '{url_path}'")
         return url_path
 
     def list_voices(self) -> Dict[str, List[str]]:
+        """Lists available Kokoro voices based on the casting sheet."""
         try:
             defaults = self.voice_cast.get("defaults", {}) if settings.audio.enable_dynamic_casting else {}
             chars = self.voice_cast.get("characters", {}) if settings.audio.enable_dynamic_casting else {}
             kokoro_list = ["af_heart", "am_michael", "am_puck", "am_fenrir", "af_bella"]
-            narrator = defaults.get("narrator")
-            if narrator and narrator not in kokoro_list:
-                kokoro_list.append(narrator)
+            if narrator := defaults.get("narrator"):
+                if narrator not in kokoro_list:
+                    kokoro_list.append(narrator)
             for v in chars.values():
-                if isinstance(v, dict):
-                    kv = v.get("kokoro_voice")
-                    if kv and kv not in kokoro_list:
+                if isinstance(v, dict) and (kv := v.get("kokoro_voice")):
+                    if kv not in kokoro_list:
                         kokoro_list.append(kv)
             return {"kokoro": sorted(list(set(kokoro_list)))}
         except Exception:

@@ -1,8 +1,6 @@
 # server/persistence_manager.py
-from pathlib import Path
 from typing import Optional
 
-from .config import settings
 from .logger import logger
 from .models import Room
 from .database_manager import DatabaseManager
@@ -10,11 +8,15 @@ from .database_manager import DatabaseManager
 class PersistenceManager:
     """Handles saving and loading of room session states via the DatabaseManager."""
 
-    def __init__(self):
-        """Initializes the manager and sets up the database connection."""
-        db_path = Path(settings.memory.database_file)
-        self.db_manager = DatabaseManager(db_path)
-        logger.info(f"Persistence manager is now using the database backend.")
+    def __init__(self, db_manager: DatabaseManager):
+        """
+        Initializes the manager with a shared database manager instance.
+
+        Args:
+            db_manager: An active instance of the DatabaseManager.
+        """
+        self.db_manager = db_manager
+        logger.info("Persistence manager initialized with a shared database backend.")
 
     def save_room(self, room: Room) -> bool:
         """
@@ -37,7 +39,7 @@ class PersistenceManager:
             room_id: The ID of the room to load.
 
         Returns:
-            A Room object if a session was found and loaded successfully, otherwise None.
+            A Room object if a session was found and loaded, otherwise None.
         """
         logger.info(f"Attempting to load session for room '{room_id}'...")
         return self.db_manager.load_room(room_id)

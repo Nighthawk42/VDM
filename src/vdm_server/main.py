@@ -1,4 +1,4 @@
-# server/main.py
+# src/vdm_server/main.py
 import base64
 import asyncio
 from pathlib import Path
@@ -10,9 +10,9 @@ from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.websockets import WebSocketState
 
-from .config import settings
-from .database_manager import DatabaseManager
-from .models import (
+from vdm_server.config import settings
+from vdm_server.database_manager import DatabaseManager
+from vdm_server.models import (
     Room,
     WSIncomingMessage,
     WSOutgoingMessage,
@@ -20,19 +20,20 @@ from .models import (
     Player,
     LoginRequest,
 )
-from .persistence_manager import PersistenceManager
-from .room_manager import RoomManager
-from .story_manager import StoryManager
-from .audio_manager import AudioManager
-from .game_manager import DiceRoller
-from .logger import logger
-from .user_manager import UserManager
+from vdm_server.persistence_manager import PersistenceManager
+from vdm_server.room_manager import RoomManager
+from vdm_server.story_manager import StoryManager
+from vdm_server.audio_manager import AudioManager
+from vdm_server.game_manager import DiceRoller
+from vdm_server.logger import logger
+from vdm_server.user_manager import UserManager
 
 # ===================================================================
 # Application Setup
 # ===================================================================
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 app = FastAPI(title="VDM - Virtual Dungeon Master")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -40,9 +41,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# These paths now correctly resolve from the project root
 app.mount("/static", StaticFiles(directory=BASE_DIR / "web"), name="static")
-app.mount("/audio", StaticFiles(directory=Path(settings.paths.audio_out_dir)), name="audio")
-
+app.mount("/audio", StaticFiles(directory=BASE_DIR / settings.paths.audio_out_dir), name="audio")
 
 class ConnectionManager:
     """Manages active WebSocket connections for each room."""

@@ -1,43 +1,50 @@
 # ===================================================================
 # VDM - Project Configuration File
 # ===================================================================
-# This file defines the project, its metadata, and its dependencies
-# for modern Python packaging tools like uv and pip.
-
 [build-system]
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "vdm-server"
-version = "0.1.0"
+version = "0.0.1"
 description = "A multiplayer, AI-driven storytelling game server."
 requires-python = ">=3.11"
 
-# These are the core dependencies, equivalent to the old requirements.txt
-# They will install the CPU-only version of PyTorch by default.
 dependencies = [
+    # Server & API Framework
     "fastapi",
-    "uvicorn",
-    "pydantic-settings",
     "orjson",
+    "pydantic-settings",
+    "uvicorn",
+
+    # Networking
     "httpx",
-    "chromadb",
-    "sentence-transformers",
+
+    # User Management
+    "passlib[bcrypt]",
+
+    # AI & Machine Learning
     "chonkie[st]",
+    "chromadb",
+    "hf_xet",
     "kokoro",
+    "misaki",
+    "sentence-transformers",
+    "soundfile",
     "torch",
     "torchaudio",
-    "passlib[bcrypt]",
+
+    # Utilities
     "PyYAML",
     "rich",
 ]
 
-# This section defines optional features that can be installed.
 [project.optional-dependencies]
-# The 'gpu' extra will install the CUDA-enabled version of PyTorch for
-# significantly better performance on NVIDIA GPUs.
 gpu = [
     "torch",
     "torchaudio",
 ]
+
+[tool.setuptools.packages.find]
+where = ["src"]

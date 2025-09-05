@@ -67,7 +67,6 @@ memory:
   # The SentenceTransformer model used to create embeddings for the AI's
   embedding_model: "google/embeddinggemma-300m"
 
-  # UPDATED: Split database paths for better organization.
   # The database for saving game room/session states.
   sessions_db_file: "./database/vdm_sessions.db"
   # The database for saving user accounts and profiles.
@@ -89,4 +88,4 @@ paths:
   memory_dir: "./memory"
 
   # Directory where generated TTS audio files are saved.
-  audio_out_dir: "./audio_out"
+  audio_out_dir: "./audio"

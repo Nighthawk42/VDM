@@ -26,10 +26,14 @@ __pycache__/
 /memory/chroma_db/
 
 # Ignore the directory for generated audio files.
-/audio_out/
+/audio/
 
 # Ignore locally generated SSL certificates.
 /ssl/
+
+# Ignore build artifacts from setuptools.
+/src/vdm_server.egg-info
+/build
 
 # Ignore local diagnostic files.
 local_digest.txt
@@ -48,9 +52,11 @@ local_digest.txt
 *.db
 *.bat
 *.ps1
+*.lock
 
 # macOS
 .DS_Store
 
 # Windows
 Thumbs.db
+uv

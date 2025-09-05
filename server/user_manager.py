@@ -7,7 +7,7 @@ from passlib.context import CryptContext
 from .logger import logger
 from .database_manager import DatabaseManager
 
-# These TypedDicts define the shape of user data for different contexts.
+# TypedDicts remain unchanged
 class StoredUserData(TypedDict):
     """Represents the data shape of a user record from the database."""
     username_cased: str
@@ -20,14 +20,12 @@ class ClientUserData(TypedDict):
     name: str
     avatar_style: str
 
-# CryptContext for hashing and verifying user passwords securely.
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 class UserManager:
     """
     Manages player registration and authentication using the SQLite database.
-    - Stores users with hashed passwords for persistence.
-    - Issues temporary in-memory session tokens upon successful login.
+    - Stores users and persistent session tokens in the database.
     """
 
     def __init__(self, db_manager: DatabaseManager):
@@ -38,9 +36,9 @@ class UserManager:
             db_manager: An active instance of the DatabaseManager.
         """
         self.db = db_manager
-        # Sessions are kept in memory. A server restart will log everyone out.
-        self._sessions: Dict[str, str] = {}
-        logger.info("UserManager initialized with database backend.")
+        # REMOVED: The in-memory session dictionary is no longer needed.
+        # self._sessions: Dict[str, str] = {}
+        logger.info("UserManager initialized with database backend for users and sessions.")
 
     def _get_password_hash(self, password: str) -> str:
         """Hashes a plain-text password."""
@@ -67,7 +65,6 @@ class UserManager:
         if len(password) < 8:
             return False, "Password must be at least 8 characters long."
 
-        # Check if user already exists in the database
         if self.db.get_user_by_name(name):
             return False, "Player name is already registered."
 
@@ -82,11 +79,7 @@ class UserManager:
 
     def login(self, name: str, password: str) -> Optional[ClientUserData]:
         """
-        Verifies user credentials against the database and creates a session token.
-
-        Args:
-            name: The username to log in with.
-            password: The plain-text password.
+        Verifies user credentials and creates a persistent session in the database.
 
         Returns:
             A dictionary with client-safe user data if successful, otherwise None.
@@ -99,12 +92,17 @@ class UserManager:
             return None
 
         session_token = str(uuid.uuid4())
-        # Store the correctly-cased username in the session map
-        self._sessions[session_token] = user_data["username_cased"]
-        logger.info(f"Player '{user_data['username_cased']}' logged in successfully.")
+        
+        # UPDATED: Create the session in the database instead of in memory.
+        username_cased = user_data["username_cased"]
+        if not self.db.create_session(session_token, username_cased):
+            logger.error(f"Failed to create database session for user '{username_cased}'")
+            return None
+
+        logger.info(f"Player '{username_cased}' logged in. DB session created.")
 
         client_data: ClientUserData = {
-            "name": user_data["username_cased"],
+            "name": username_cased,
             "avatar_style": user_data["avatar_style"],
             "token": session_token
         }
@@ -112,29 +110,25 @@ class UserManager:
 
     def get_user_by_token(self, token: str) -> Optional[Dict[str, Any]]:
         """
-        Finds a user's full data from the database using their session token.
-
-        Args:
-            token: The user's active session token.
+        Finds a user's data from the DB using their persistent session token.
 
         Returns:
-            A dictionary with the user's database record if the token is valid,
-            otherwise None.
+            A dictionary with the user's database record if the token is valid.
         """
-        username = self._sessions.get(token)
-        if not username:
+        # UPDATED: Validate the token against the database.
+        session = self.db.get_session_by_token(token)
+        if not session:
             return None
         
-        # Fetch fresh user data from the database
-        return self.db.get_user_by_name(username)
+        # Session is valid, now fetch the full user data using the username from the session.
+        return self.db.get_user_by_name(session["username_lower"])
 
     def logout(self, token: str):
         """
-        Removes a session token, effectively logging the user out.
+        Deletes a session token from the database.
 
         Args:
             token: The session token to invalidate.
         """
-        if token in self._sessions:
-            del self._sessions[token]
-            logger.info(f"Session token {token[:8]}... ended.")
+        if self.db.delete_session(token):
+            logger.info(f"Session token {token[:8]}... deleted from database.")

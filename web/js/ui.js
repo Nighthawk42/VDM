@@ -1,5 +1,9 @@
 // web/js/ui.js
 import { initAudio } from './audio.js';
+import { dom } from './dom-elements.js';
+import { initSpeechRecognition } from './speech-recognition.js';
+import { initCommandPreview } from './commands.js';
+import { initAvatarSelection } from './avatars.js';
 
 /**
  * @typedef {import('./state.js').AppState} AppState
@@ -22,88 +26,26 @@ import { initAudio } from './audio.js';
  * @property {() => void} showLoginView
  */
 
-// List of available avatar styles.
-const AVATAR_STYLES = [
-    "adventurer", "adventurer-neutral", "avataaars", "big-ears", "big-smile",    
-    "bottts", "croodles", "fun-emoji", "icons", "identicon", "initials",    
-    "lorelei", "micah", "miniavs", "open-peeps", "personas", "pixel-art", "rings"
-];
-
-// NEW: Define available slash commands for the previewer.
-const COMMANDS = {
-    "/roll": "[dice] - Rolls dice (e.g., 2d6+3). Defaults to 1d20.",
-    "/ooc": "[message] - Sends an out-of-character message.",
-    "/remember": "[fact] - Saves a fact to the GM's long-term memory.",
-    "/save": "- Saves the current game session.",
-    "/next": "- Submits the current turn actions to the GM."
-};
-
-
 /**
- * Initializes and returns the UI module.
+ * Initializes and returns the UI module, which orchestrates all sub-modules.
  * @param {AppState} state - The central state object.
  * @returns {AppUI}
  */
 export function initUI(state) {
-    // A cache for all DOM elements we will interact with.
-    const dom = {
-        // Auth Forms & Views
-        loginView: document.getElementById('login-view'),
-        registerView: document.getElementById('register-view'),
-        loginForm: document.getElementById('login-form'),
-        registerForm: document.getElementById('register-form'),
-        loginNameInput: document.getElementById('login-name'),
-        loginPasswordInput: document.getElementById('login-password'),
-        registerNameInput: document.getElementById('register-name'),
-        registerPasswordInput: document.getElementById('register-password'),
-        registerConfirmPasswordInput: document.getElementById('register-confirm-password'),
-        loginError: document.getElementById('login-error'),
-        registerError: document.getElementById('register-error'),
-        switchToRegisterBtn: document.getElementById('switch-to-register'),
-        switchToLoginBtn: document.getElementById('switch-to-login'),
-        
-        // Avatar Selection
-        avatarSelectionGrid: document.getElementById('avatar-selection-grid'),
-        registerAvatarPreview: document.getElementById('register-avatar-preview'),
-
-        // Main App View
-        mainAppView: document.getElementById('main-app-view'),
-        sidebar: document.querySelector('.sidebar'),
-        chatArea: document.querySelector('.chat-area'),
-
-        // Player Info & Connection
-        playerIdentity: document.getElementById('player-identity'),
-        playerCardAvatar: document.getElementById('player-card-avatar'),
-        playerCardName: document.getElementById('player-card-name'),
-        logoutButton: document.getElementById('logout-button'),
-        connectionForm: document.getElementById('connection-form'),
-        roomIdInput: document.getElementById('room-id-input'),
-        joinButton: document.getElementById('join-button'),
-        
-        // In-Room Info
-        roomInfo: document.getElementById('room-info'),
-        roomName: document.getElementById('room-name'),
-        playerList: document.getElementById('player-list'),
-        hostControlsContainer: document.getElementById('host-controls-container'),
-        startGameButton: document.getElementById('start-game-button'),
-        resumeGameButton: document.getElementById('resume-game-button'),
-        leaveButton: document.getElementById('leave-button'),
-
-        // Chat
-        chatLog: document.getElementById('chat-log'),
-        messageInput: document.getElementById('message-input'),
-        sendButton: document.getElementById('send-button'),
-        resolveButton: document.getElementById('resolve-button'),
-        gmThinkingIndicator: document.getElementById('gm-thinking-indicator'),
-        commandPreview: document.getElementById('command-preview'), // Command preview element
-        themeToggle: document.getElementById('theme-toggle'),
-    };
-
-    // Module dependencies, to be set later.
     let api = null;
     const audio = initAudio(state);
+    
+    // Initialize all imported UI sub-modules
+    const speech = initSpeechRecognition({
+        onFinalResult: (text) => { dom.messageInput.value = text; },
+        onStatusChange: (isListening) => { dom.micButton.classList.toggle('listening', isListening); }
+    });
+    initCommandPreview(dom);
+    initAvatarSelection(dom, state);
 
-    /** Main render function to switch between primary UI views */
+    /**
+     * Main render function to switch between the primary UI views (auth vs. app).
+     */
     function _render() {
         const mainElement = document.querySelector('main');
         dom.loginView.style.display = 'none';
@@ -138,64 +80,21 @@ export function initUI(state) {
             }
         }
     }
-    
-    /** NEW: Updates the command preview based on input */
-    function _updateCommandPreview() {
-        const text = dom.messageInput.value;
-        if (text.startsWith('/')) {
-            const [typedCmd] = text.split(' ');
-            let html = '<h4>Commands</h4><ul>';
-            for (const [cmd, desc] of Object.entries(COMMANDS)) {
-                if (cmd.startsWith(typedCmd)) {
-                    html += `<li><strong>${cmd}</strong>: ${desc}</li>`;
-                }
-            }
-            html += '</ul>';
-            dom.commandPreview.innerHTML = html;
-            dom.commandPreview.style.display = 'block';
-        } else {
-            dom.commandPreview.style.display = 'none';
-        }
-    }
 
-    // --- Other private functions (_updateAvatarSelectionUI, _populateAvatarGrid, etc. are unchanged) ---
-
-    function _updateAvatarSelectionUI() {
-        const name = dom.registerNameInput.value.trim() || 'player';
-        dom.registerAvatarPreview.src = `https://api.dicebear.com/9.x/${state.selectedAvatarStyle}/svg?seed=${encodeURIComponent(name)}`;
-        dom.avatarSelectionGrid.querySelectorAll('.avatar-option').forEach(opt => {
-            opt.classList.toggle('selected', opt.dataset.style === state.selectedAvatarStyle);
-        });
-    }
-    
-    function _populateAvatarGrid() {
-        const grid = dom.avatarSelectionGrid;
-        grid.innerHTML = '';
-        AVATAR_STYLES.forEach(style => {
-            const option = document.createElement('div');
-            option.className = 'avatar-option';
-            option.dataset.style = style;
-            const img = document.createElement('img');
-            img.src = `https://api.dicebear.com/9.x/${style}/svg`;
-            img.alt = style;
-            option.appendChild(img);
-            grid.appendChild(option);
-        });
-        _updateAvatarSelectionUI();
-    }
-
+    /** Displays an error message in a designated element. */
     function _showError(element, message) {
         element.textContent = message;
         element.style.display = 'block';
     }
 
+    /** Hides an error message element. */
     function _hideError(element) {
         element.style.display = 'none';
     }
 
-    /** Attach all event listeners for the application */
+    /** Attaches all persistent event listeners for the application. */
     function _attachListeners() {
-        // --- Auth & Connection Listeners (mostly unchanged) ---
+        // --- Auth & Connection Listeners ---
         dom.switchToRegisterBtn.addEventListener('click', () => { state.uiView = 'register'; _render(); });
         dom.switchToLoginBtn.addEventListener('click', () => { state.uiView = 'login'; _render(); });
 
@@ -205,18 +104,10 @@ export function initUI(state) {
             const name = dom.registerNameInput.value.trim();
             const password = dom.registerPasswordInput.value;
             const confirm = dom.registerConfirmPasswordInput.value;
-            if (password !== confirm) {
-                _showError(dom.registerError, "Passwords do not match.");
-                return;
-            }
+            if (password !== confirm) { _showError(dom.registerError, "Passwords do not match."); return; }
             const result = await api.register(name, state.selectedAvatarStyle, password);
-            if (result.success) {
-                alert(result.message);
-                state.uiView = 'login';
-                _render();
-            } else {
-                _showError(dom.registerError, result.message);
-            }
+            if (result.success) { alert(result.message); state.uiView = 'login'; _render(); } 
+            else { _showError(dom.registerError, result.message); }
         });
 
         dom.loginForm.addEventListener('submit', async (e) => {
@@ -230,9 +121,7 @@ export function initUI(state) {
                 localStorage.setItem('vdm-player', JSON.stringify(result.data));
                 state.uiView = 'chat';
                 _render();
-            } else {
-                _showError(dom.loginError, result.message);
-            }
+            } else { _showError(dom.loginError, result.message); }
         });
         
         dom.logoutButton.addEventListener('click', () => api.logout());
@@ -242,48 +131,37 @@ export function initUI(state) {
         });
         dom.leaveButton.addEventListener('click', () => api.disconnect());
 
-        // --- Avatar Selection Listeners (unchanged) ---
-        dom.registerNameInput.addEventListener('input', () => _updateAvatarSelectionUI());
-        dom.avatarSelectionGrid.addEventListener('click', (e) => {
-            const option = e.target.closest('.avatar-option');
-            if (option && option.dataset.style) {
-                state.selectedAvatarStyle = option.dataset.style;
-                _updateAvatarSelectionUI();
-            }
-        });
-
-        // --- Chat Listeners ---
+        // --- Chat & Speech Listeners ---
         dom.sendButton.addEventListener('click', () => {
             const message = dom.messageInput.value.trim();
             if (message) api.sendMessage('say', { message });
             dom.messageInput.value = '';
-            _updateCommandPreview();
             dom.messageInput.focus();
         });
-
         dom.messageInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                dom.sendButton.click();
-            }
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); dom.sendButton.click(); }
         });
-        // NEW: Add input event listener for command preview
-        dom.messageInput.addEventListener('input', _updateCommandPreview);
+        if (speech) {
+            dom.micButton.addEventListener('mousedown', speech.startListening);
+            dom.micButton.addEventListener('mouseup', speech.stopListening);
+            dom.micButton.addEventListener('touchstart', speech.startListening, { passive: true });
+            dom.micButton.addEventListener('touchend', speech.stopListening);
+        } else {
+            dom.micButton.style.display = 'none';
+        }
 
+        // --- Host & Game Listeners ---
         dom.resolveButton.addEventListener('click', () => api.sendMessage('submit_turn'));
         dom.startGameButton.addEventListener('click', () => api.sendMessage('start_game'));
         dom.resumeGameButton.addEventListener('click', () => api.sendMessage('resume_game'));
 
-        // --- Misc Listeners (unchanged) ---
+        // --- Misc Listeners ---
         dom.themeToggle.addEventListener('click', () => {
             const isLight = document.body.classList.toggle('light-theme');
             localStorage.setItem('vdm-theme', isLight ? 'light' : 'dark');
         });
-
         const resumeAudio = () => {
-            if (state.audioContext && state.audioContext.state === 'suspended') {
-                state.audioContext.resume();
-            }
+            if (state.audioContext && state.audioContext.state === 'suspended') { state.audioContext.resume(); }
             document.body.removeEventListener('click', resumeAudio);
         };
         document.body.addEventListener('click', resumeAudio);
@@ -292,19 +170,16 @@ export function initUI(state) {
     // --- Initialize ---
     const savedTheme = localStorage.getItem('vdm-theme') || 'dark';
     document.body.classList.toggle('light-theme', savedTheme === 'light');
-    _populateAvatarGrid();
     _attachListeners();
-    _render(); // Set initial view
+    _render();
 
-    /** @type {AppUI} */
+    // --- Public Interface ---
     const publicInterface = {
-        setApi(apiModule) {
-            api = apiModule;
-        },
-
+        setApi(apiModule) { api = apiModule; },
         logMessage(type, data, isBatch = false) {
             const msgDiv = document.createElement('div');
             msgDiv.classList.add('msg', type);
+
             if (type === 'system') {
                 msgDiv.textContent = data.message;
             } else if (type === 'chat') {
@@ -336,24 +211,17 @@ export function initUI(state) {
                 msgDiv.appendChild(avatarImg);
                 msgDiv.appendChild(contentDiv);
             }
+            
             dom.chatLog.appendChild(msgDiv);
             if (!isBatch) {
                 dom.chatLog.scrollTop = dom.chatLog.scrollHeight;
             }
         },
-        
-        // NEW: Function to load historical messages
         loadChatHistory(messages) {
-            dom.chatLog.innerHTML = ''; // Clear the chat log first
-            messages.forEach(msg => {
-                // The 'chat' type is hardcoded as only chat messages are in history
-                this.logMessage('chat', msg, true);
-            });
-            dom.chatLog.scrollTop = dom.chatLog.scrollHeight; // Scroll to bottom after batch rendering
+            dom.chatLog.innerHTML = '';
+            messages.forEach(msg => { this.logMessage('chat', msg, true); });
+            dom.chatLog.scrollTop = dom.chatLog.scrollHeight;
         },
-
-        // --- Other public methods (updateRoomState, streaming handlers, etc.) are mostly unchanged ---
-        
         updateRoomState(room) {
             state.room = room;
             dom.roomName.textContent = room.room_id;
@@ -370,23 +238,24 @@ export function initUI(state) {
                 const nameSpan = document.createElement('span');
                 nameSpan.className = 'player-name';
                 nameSpan.textContent = player.name;
-                if (room.host_player_id === player.id) {
-                    nameSpan.textContent += ' 👑'; // Host indicator
-                }
-                
-                const hpSpan = document.createElement('span');
-                hpSpan.className = 'player-hp';
-                if (player.sheet) {
-                    hpSpan.textContent = `${player.sheet.hp}/${player.sheet.max_hp} HP`;
+                if (room.host_player_id === player.id) { nameSpan.textContent += ' 👑'; }
+
+                const turnIndicator = document.createElement('span');
+                turnIndicator.className = 'turn-indicator';
+                if (room.current_turn_actions && room.current_turn_actions[player.id]) {
+                    playerLi.classList.add('action-submitted');
+                    turnIndicator.textContent = '✅';
                 }
 
+                // REMOVED: The hpSpan logic is gone.
+                
                 playerLi.appendChild(avatarImg);
                 playerLi.appendChild(nameSpan);
-                playerLi.appendChild(hpSpan);
+                playerLi.appendChild(turnIndicator);
                 dom.playerList.appendChild(playerLi);
             });
             
-            const isHost = (state.playerInfo && room.host_player_id === state.playerInfo.id);
+            const isHost = (state.playerInfo && room.host_player_id === state.clientId);
             const inLobby = room.game_state === "LOBBY";
             const gmIsProcessing = room.turn_state === "GM_PROCESSING";
             const actionsExist = Object.keys(room.current_turn_actions || {}).length > 0;
@@ -398,23 +267,16 @@ export function initUI(state) {
             dom.resolveButton.disabled = !actionsExist || gmIsProcessing;
             dom.messageInput.disabled = gmIsProcessing || inLobby;
             dom.sendButton.disabled = gmIsProcessing || inLobby;
+            dom.micButton.disabled = gmIsProcessing || inLobby;
         },
-
-        showRoomView(roomId) {
-            state.isConnected = true;
-            _render();
-        },
-        showConnectionView() {
-            state.isConnected = false;
-            _render();
-        },
+        showRoomView(roomId) { state.isConnected = true; _render(); },
+        showConnectionView() { state.isConnected = false; _render(); },
         showLoginView() {
             state.uiView = 'login';
             state.isConnected = false;
-            state.playerInfo = null; // Ensure player info is cleared
+            state.playerInfo = null;
             _render();
         },
-
         handleStreamStart() {
             const msgDiv = document.createElement('div');
             msgDiv.classList.add('msg', 'chat', 'gm', 'streaming');
@@ -427,31 +289,21 @@ export function initUI(state) {
             authorSpan.className = 'author';
             authorSpan.textContent = 'GM';
             const messageSpan = document.createElement('span');
-            
             contentDiv.appendChild(authorSpan);
             contentDiv.appendChild(messageSpan);
             msgDiv.appendChild(avatarImg);
             msgDiv.appendChild(contentDiv);
             dom.chatLog.appendChild(msgDiv);
-
-            state.activeStream = {
-                messageElement: msgDiv,
-                contentElement: messageSpan,
-            };
+            state.activeStream = { messageElement: msgDiv, contentElement: messageSpan };
             audio.startStream();
         },
-
         handleChatChunk(content) {
             if (state.activeStream && state.activeStream.contentElement) {
                 state.activeStream.contentElement.textContent += content;
                 dom.chatLog.scrollTop = dom.chatLog.scrollHeight;
             }
         },
-
-        handleAudioChunk(chunk) {
-            audio.queueAndPlay(chunk);
-        },
-
+        handleAudioChunk(chunk) { audio.queueAndPlay(chunk); },
         handleStreamEnd(finalMessage) {
             if (state.activeStream && state.activeStream.messageElement) {
                 state.activeStream.messageElement.classList.remove('streaming');
@@ -459,11 +311,7 @@ export function initUI(state) {
             state.activeStream = null;
             audio.endStream();
         },
-
-        playAudioFile(url) {
-            audio.playFullAudioFile(url);
-        }
+        playAudioFile(url) { audio.playFullAudioFile(url); }
     };
-
     return publicInterface;
 }

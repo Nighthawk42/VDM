@@ -33,9 +33,10 @@ class DatabaseManager:
             # Connect to the users database
             self.users_db_path.parent.mkdir(parents=True, exist_ok=True)
             self.users_conn = sqlite3.connect(self.users_db_path, check_same_thread=False)
-            self.users_conn.row_factory = sqlite3.Row # Use Row factory for dict-like user results
+            self.users_conn.row_factory = sqlite3.Row
             logger.info(f"Connected to users database at '{self.users_db_path}'.")
             self._create_users_table()
+            self._create_sessions_table() # NEW: Create sessions table on startup
 
         except sqlite3.Error as e:
             logger.critical(f"Database connection failed: {e}", exc_info=True)
@@ -72,6 +73,63 @@ class DatabaseManager:
             self.users_conn.commit()
         except sqlite3.Error as e:
             logger.error(f"Failed to create 'users' table: {e}", exc_info=True)
+
+    def _create_sessions_table(self):
+        """Creates the 'sessions' table in the users database if it's not present."""
+        if not self.users_conn: return
+        try:
+            cursor = self.users_conn.cursor()
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS sessions (
+                    token TEXT PRIMARY KEY,
+                    username_lower TEXT NOT NULL,
+                    FOREIGN KEY (username_lower) REFERENCES users (username_lower)
+                )
+            """)
+            self.users_conn.commit()
+        except sqlite3.Error as e:
+            logger.error(f"Failed to create 'sessions' table: {e}", exc_info=True)
+
+    # --- Session Management Methods (Uses users_conn) ---
+
+    def create_session(self, token: str, username: str) -> bool:
+        """Stores a new session token in the database."""
+        if not self.users_conn: return False
+        try:
+            cursor = self.users_conn.cursor()
+            cursor.execute(
+                "INSERT INTO sessions (token, username_lower) VALUES (?, ?)",
+                (token, username.lower())
+            )
+            self.users_conn.commit()
+            return True
+        except sqlite3.Error as e:
+            logger.error(f"Failed to create session for user '{username}': {e}", exc_info=True)
+            return False
+
+    def get_session_by_token(self, token: str) -> Optional[Dict[str, Any]]:
+        """Retrieves a session from the database by its token."""
+        if not self.users_conn: return None
+        try:
+            cursor = self.users_conn.cursor()
+            cursor.execute("SELECT * FROM sessions WHERE token = ?", (token,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+        except sqlite3.Error as e:
+            logger.error(f"Failed to retrieve session for token '{token[:8]}...': {e}", exc_info=True)
+            return None
+
+    def delete_session(self, token: str) -> bool:
+        """Deletes a session token from the database (logout)."""
+        if not self.users_conn: return False
+        try:
+            cursor = self.users_conn.cursor()
+            cursor.execute("DELETE FROM sessions WHERE token = ?", (token,))
+            self.users_conn.commit()
+            return True
+        except sqlite3.Error as e:
+            logger.error(f"Failed to delete session for token '{token[:8]}...': {e}", exc_info=True)
+            return False
 
     # --- User Management Methods (Uses users_conn) ---
 

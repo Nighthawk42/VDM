@@ -60,8 +60,11 @@ audio:
 # Configures the AI's long-term memory and how game sessions are saved.
 # ------------------------------------------------------------------------------
 memory:
+  # The chunking strategy to use for breaking down text for the RAG system.
+  # Options: "simple" (original method), "chonkie" (advanced library).
+  chunker: "simple"
+
   # The SentenceTransformer model used to create embeddings for the AI's
-  # long-term memory (RAG). This runs locally.
   embedding_model: "google/embeddinggemma-300m"
 
   # UPDATED: Split database paths for better organization.

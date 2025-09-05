@@ -35,11 +35,11 @@ class AudioSettings(BaseModel):
 class MemorySettings(BaseModel):
     """
     Settings for memory and database persistence.
-    UPDATED: Now includes separate paths for user and session databases.
     """
+    chunker: Literal["simple", "chonkie"]
     embedding_model: str
-    sessions_db_file: str # Path to the sessions/rooms database.
-    users_db_file: str    # Path to the users/accounts database.
+    sessions_db_file: str
+    users_db_file: str
 
 class PathsSettings(BaseModel):
     prompts_file: str

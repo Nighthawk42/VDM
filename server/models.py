@@ -5,7 +5,15 @@ from typing import Dict, List, Literal, Any, Optional
 # ===================================================================
 # Core Game & Application Models
 # ===================================================================
-# These Pydantic models define the structure of our application's state.
+
+class PlayerSheet(BaseModel):
+    """Represents a player's character sheet with stats and inventory."""
+    hp: int = 10
+    max_hp: int = 10
+    # Placeholders for future expansion
+    # attributes: Dict[str, int] = Field(default_factory=dict)
+    # inventory: List[str] = Field(default_factory=list)
+
 
 class Player(BaseModel):
     """Represents a player within a game room."""
@@ -13,6 +21,8 @@ class Player(BaseModel):
     name: str
     avatar_style: str = "adventurer"
     is_active: bool = True
+    sheet: PlayerSheet = Field(default_factory=PlayerSheet)
+
 
 class ChatMessage(BaseModel):
     """Represents a single message in the chat history."""
@@ -46,7 +56,6 @@ class LoginRequest(BaseModel):
 # ===================================================================
 # WebSocket Protocol Models
 # ===================================================================
-# These models define the contract for messages sent over the WebSocket.
 
 class WSIncomingMessage(BaseModel):
     """A message received from a client."""

@@ -77,20 +77,13 @@ class ConnectionManager:
 
 
 # --- Instantiate Managers ---
-# UPDATED: Initialize the DatabaseManager with separate paths for sessions and users.
 db_manager = DatabaseManager(
     sessions_db_path=Path(settings.memory.sessions_db_file),
     users_db_path=Path(settings.memory.users_db_file)
 )
-
-# Managers that depend on the database manager
 persistence_manager = PersistenceManager(db_manager=db_manager)
 user_manager = UserManager(db_manager=db_manager)
-
-# RoomManager depends on other managers
 room_manager = RoomManager(user_manager=user_manager, persistence_manager=persistence_manager)
-
-# Standalone managers
 story_manager = StoryManager()
 audio_manager = AudioManager()
 game_manager = DiceRoller()
@@ -100,9 +93,6 @@ connection_manager = ConnectionManager()
 # ===================================================================
 # Core Game Loop Logic
 # ===================================================================
-
-# ... (the rest of the file is unchanged) ...
-
 
 async def _start_game_setup_turn(room_id: str):
     """
@@ -128,7 +118,7 @@ async def _start_game_setup_turn(room_id: str):
                 room_id, WSOutgoingMessage(kind="chat_chunk", payload={"content": text_chunk})
             )
 
-            audio_generator = audio_manager.synthesize_stream(text_chunk, room_id) # Pass room_id for audio path
+            audio_generator = audio_manager.synthesize_stream(text_chunk, room_id)
             async for audio_chunk in audio_generator:
                 encoded_chunk = base64.b64encode(audio_chunk).decode("utf-8")
                 await connection_manager.broadcast(
@@ -145,7 +135,7 @@ async def _start_game_setup_turn(room_id: str):
         )
     else:
         gm_prompt = await story_manager.generate_gm_response(room_id, [])
-        audio_url = await audio_manager.synthesize(gm_prompt, room_id) # Pass room_id for audio path
+        audio_url = await audio_manager.synthesize(gm_prompt, room_id)
         gm_message = room_manager.add_message(
             room_id, "gm", "GM", gm_prompt, audio_url=audio_url
         )
@@ -229,7 +219,7 @@ async def _advance_turn_streaming(
             room_id, WSOutgoingMessage(kind="chat_chunk", payload={"content": text_chunk})
         )
 
-        audio_generator = audio_manager.synthesize_stream(text_chunk, room_id) # Pass room_id for audio path
+        audio_generator = audio_manager.synthesize_stream(text_chunk, room_id)
         async for audio_chunk in audio_generator:
             encoded_chunk = base64.b64encode(audio_chunk).decode("utf-8")
             await connection_manager.broadcast(
@@ -254,7 +244,7 @@ async def _advance_turn_non_streaming(
     gm_response = await story_manager.generate_gm_response(
         room_id, history, turn_actions
     )
-    audio_url = await audio_manager.synthesize(gm_response, room_id) # Pass room_id for audio path
+    audio_url = await audio_manager.synthesize(gm_response, room_id)
     gm_message = room_manager.add_message(
         room_id, "gm", "GM", gm_response, audio_url=audio_url
     )
@@ -289,7 +279,7 @@ async def _resume_game_turn(room_id: str, player: Player):
 
     history = [msg.model_dump() for msg in room_state.messages]
     gm_summary = await story_manager.generate_resume_summary(room_id, history)
-    audio_url = await audio_manager.synthesize(gm_summary, room_id) # Pass room_id for audio path
+    audio_url = await audio_manager.synthesize(gm_summary, room_id)
     gm_message = room_manager.add_message(
         room_id, "gm", "GM", gm_summary, audio_url=audio_url
     )
@@ -353,14 +343,12 @@ async def websocket_endpoint(
     await connection_manager.connect(room_id, websocket)
     room, player = add_player_result
 
-    # Send the existing chat history to the newly connected player
     if room.messages:
         await websocket.send_text(
             WSOutgoingMessage(
                 kind="chat_history", payload={"messages": [m.model_dump() for m in room.messages]}
             ).model_dump_json()
         )
-
 
     if not room.host_player_id:
         room.host_player_id = player_id
@@ -514,7 +502,7 @@ async def websocket_endpoint(
                 logger.error(f"Error processing message from {player.name}", exc_info=True)
 
     except WebSocketDisconnect:
-        user_manager.logout(player_token)
+        # FIXED: This no longer logs the user out, it just disconnects them from the room.
         connection_manager.disconnect(room_id, websocket)
         disconnected_player = room_manager.remove_player(room_id, player_id)
         if disconnected_player and (room_state := room_manager.get_room(room_id)):

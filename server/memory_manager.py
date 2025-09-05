@@ -19,7 +19,6 @@ from .config import settings
 from .logger import logger
 
 # This block is for static analysis only (for Pylance).
-# It is not executed at runtime, so it won't cause an ImportError.
 if TYPE_CHECKING:
     from chonkie import SemanticChunker
     from chonkie.embeddings import SentenceTransformerEmbeddings
@@ -70,7 +69,11 @@ class MemoryManager:
                     raise ImportError("Chonkie is configured but not installed correctly. Please run 'uv pip install \"chonkie[st]\"'.")
                 
                 logger.info("Initializing Chonkie with SemanticChunker...")
-                embedding_handler = SentenceTransformerEmbeddings(model_name=settings.memory.embedding_model, device="cpu")
+                # FIXED: Changed keyword from 'model_name' to 'model'
+                embedding_handler = SentenceTransformerEmbeddings(
+                    model=settings.memory.embedding_model, 
+                    device="cpu"
+                )
                 self.chunker = SemanticChunker(embedding_model=embedding_handler)
                 self.embedder = embedding_handler
                 logger.info("Using 'chonkie' for text chunking.")
@@ -107,9 +110,8 @@ class MemoryManager:
         if not text or not text.strip(): return
         try:
             if settings.memory.chunker == "chonkie" and self.chunker:
-                # The runtime code knows what self.chunker(text) returns
                 chonkie_chunks = self.chunker(text)
-                chunks = [c.text for c in chonkie_chunks if c.text.strip()] # type: ignore (This might break, we're see)
+                chunks = [c.text for c in chonkie_chunks if c.text.strip()] # type: ignore (This *might* break things)
             else:
                 chunks = self._simple_chunker(text)
 

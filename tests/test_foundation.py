@@ -3,6 +3,7 @@
 import sqlite3
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from vdm.config import Settings
@@ -44,3 +45,15 @@ def test_startup_is_idempotent(tmp_path: Path) -> None:
     with storage.connect(Domain.AUTH) as connection:
         saved = connection.execute("SELECT username FROM users WHERE id = ?", ("u1",)).fetchone()
         assert saved == ("Player",)
+
+
+def test_unknown_schema_is_not_downgraded(tmp_path: Path) -> None:
+    """A newer database version must survive an older application startup."""
+    storage = SqliteStorage(tmp_path)
+    storage.initialize()
+    with storage.connect(Domain.AUTH) as connection:
+        connection.execute("PRAGMA user_version = 2")
+    with pytest.raises(RuntimeError, match="Unsupported auth schema version: 2"):
+        storage.initialize()
+    with storage.connect(Domain.AUTH) as connection:
+        assert connection.execute("PRAGMA user_version").fetchone() == (2,)

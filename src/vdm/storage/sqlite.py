@@ -109,6 +109,9 @@ class SqliteStorage:
         self.directory.mkdir(parents=True, exist_ok=True)
         for domain, schema in SCHEMAS.items():
             with self.connect(domain) as connection:
+                version = connection.execute("PRAGMA user_version").fetchone()[0]
+                if version > 1:
+                    raise RuntimeError(f"Unsupported {domain.value} schema version: {version}")
                 connection.execute("PRAGMA journal_mode = WAL")
                 connection.executescript(schema)
                 connection.execute("PRAGMA user_version = 1")

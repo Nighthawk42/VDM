@@ -8,7 +8,8 @@ The local ignored `plan.md` is the living architecture reference. This tracked r
 - [x] Package the Python 3.12 backend with `uv`, Ruff, mypy, and pytest.
 - [x] Add validated configuration and four split SQLite domain schemas.
 - [x] Add a runnable service, readiness endpoint, and a simple testing landing page.
-- [ ] Add schema migration versioning before changing database schemas.
+- [x] Refuse to open a database with an unknown newer schema version.
+- [ ] Add versioned migrations before changing database schemas.
 - [ ] Add accounts, Argon2id password hashing, sessions, room roles, and TOTP.
 
 ## Phase 2: Rules and turns

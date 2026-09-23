@@ -163,6 +163,8 @@ em { color:var(--accent); font-style:normal; }
 .character-editor-head { display:flex; justify-content:space-between; gap:1rem; align-items:start; }
 .character-editor-head h4 { margin:.3rem 0 1rem; font-family:Georgia,serif; font-size:1.6rem; font-weight:500; }
 .character-name,.character-dc { max-width:380px; margin-bottom:.9rem; }
+.character-basics { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.6rem; max-width:620px; margin-bottom:.9rem; }
+.character-basics label { display:flex; flex-direction:column; gap:.4rem; color:var(--subtext); font-size:.78rem; font-weight:700; }
 .character-section { margin-top:1.5rem; border-top:1px solid var(--border); padding-top:1.2rem; }
 .character-section h5 { margin:0 0 1rem; font-size:1rem; }
 .ability-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.7rem; }
@@ -192,4 +194,4 @@ em { color:var(--accent); font-style:normal; }
 @media(max-width:700px) { .character-workspace { padding:1rem; } .character-layout { grid-template-columns:1fr; } .character-roster { flex-direction:row; flex-wrap:wrap; align-items:center; } .character-choice { min-width:125px; } .character-create { width:100%; } .ability-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media(max-width:860px) { .table-sidebar { grid-column:1; grid-row:1; border-left:0; } .chronicle { grid-column:1; grid-row:2; } }
 @media(max-width:560px) { .brand small,.theme-picker span,.composer-top > span,.composer-bottom span:first-child { display:none; } .site-header { height:62px; } .header-actions { gap:.35rem; } .theme-picker select { min-width:90px; } .auth-layout { min-height:calc(100vh - 62px); } .auth-intro h1 { font-size:3.1rem; } .auth-intro > p { font-size:1rem; } .page-width { padding:2rem 1rem; } .lobby-hero h1 { font-size:2.8rem; } .rooms-card,.action-card { padding:1.2rem; } .table-sidebar { gap:.6rem; padding:.8rem 1rem; } .table-identity h1 { font-size:1rem; } .share-button { padding:.55rem .6rem; font-size:.72rem; } .chronicle { height:calc(100vh - 129px); } .chronicle-header { height:73px; } .chronicle-scroll { padding:1rem; } .composer-wrap { padding:.7rem; } }
-@media(max-width:560px) { .ability-grid { grid-template-columns:1fr; } .character-editor,.character-roster { padding:1rem; } .character-save { flex-direction:column; align-items:stretch; } }
+@media(max-width:560px) { .ability-grid,.character-basics { grid-template-columns:1fr; } .character-editor,.character-roster { padding:1rem; } .character-save { flex-direction:column; align-items:stretch; } }

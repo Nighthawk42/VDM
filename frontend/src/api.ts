@@ -15,6 +15,9 @@ export type MessageKind = Exclude<Event['kind'], 'roll'>
 export type Ability = 'STR' | 'DEX' | 'CON' | 'INT' | 'WIS' | 'CHA'
 export type Skill = { ability: Ability; ranks: number; misc: number }
 export type CharacterSheet = {
+  race: string
+  class_name: string
+  level: number
   abilities: Record<Ability, number>
   skills: Record<string, Skill>
   notes: string

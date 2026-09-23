@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { api, type Ability, type Character, type CharacterSheet, type Event, type Room, type User } from './api'
 
 const abilities: Ability[] = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA']
-const extraKeys = new Set(['abilities', 'skills', 'notes'])
+const extraKeys = new Set(['race', 'class_name', 'level', 'abilities', 'skills', 'notes'])
 
 function extrasFor(sheet: CharacterSheet): string {
   return JSON.stringify(Object.fromEntries(Object.entries(sheet).filter(([key]) => !extraKeys.has(key))), null, 2)
@@ -119,6 +119,7 @@ export function CharacterWorkspace({ room, user, onRoll }: {
       {draft ? <div className="character-editor">
         <div className="character-editor-head"><div><span className="section-kicker">CHARACTER</span><h4>{draft.name}</h4></div><span className="muted">{canEdit ? 'Editable' : 'View only'}</span></div>
         <label className="character-name">Name<input maxLength={80} value={draft.name} disabled={!canEdit} onChange={event => setDraft({ ...draft, name: event.target.value })} /></label>
+        <div className="character-basics"><label>Race<input maxLength={80} value={draft.sheet.race} disabled={!canEdit} onChange={event => changeSheet({ race: event.target.value })} placeholder="e.g. Elf" /></label><label>Class<input maxLength={80} value={draft.sheet.class_name} disabled={!canEdit} onChange={event => changeSheet({ class_name: event.target.value })} placeholder="e.g. Rogue" /></label><label>Level<input type="number" min={1} max={99} value={draft.sheet.level} disabled={!canEdit} onChange={event => changeSheet({ level: Number(event.target.value) })} /></label></div>
         {isGM && <label className="character-dc">Check DC (optional)<input type="number" min={0} max={100} value={dc} onChange={event => setDc(event.target.value)} placeholder="Set by GM" /></label>}
         <div className="character-section"><h5>Ability scores</h5><div className="ability-grid">{abilities.map(ability => <div className="ability-card" key={ability}>
           <label>{ability}<input type="number" min={1} max={99} value={draft.sheet.abilities[ability]} disabled={!canEdit} onChange={event => changeSheet({ abilities: { ...draft.sheet.abilities, [ability]: Number(event.target.value) } })} /></label>

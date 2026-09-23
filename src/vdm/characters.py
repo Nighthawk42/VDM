@@ -34,6 +34,15 @@ class Character:
 def validate_sheet(raw: dict[str, Any]) -> dict[str, Any]:
     """Validate core 3.5e fields while preserving additional JSON fields."""
     sheet = dict(raw)
+    for key in ("race", "class_name"):
+        value = sheet.get(key, "")
+        if not isinstance(value, str) or len(value) > 80:
+            raise ValueError(f"{key} must be text of at most 80 characters")
+        sheet[key] = value
+    level = sheet.get("level", 1)
+    if isinstance(level, bool) or not isinstance(level, int) or not 1 <= level <= 99:
+        raise ValueError("Level must be a whole number from 1 to 99")
+    sheet["level"] = level
     abilities = sheet.get("abilities", {})
     if not isinstance(abilities, dict) or any(key not in ABILITIES for key in abilities):
         raise ValueError("Abilities must use STR, DEX, CON, INT, WIS, and CHA")
@@ -88,7 +97,7 @@ class CharacterService:
     def _from_row(row: sqlite3.Row) -> Character:
         return Character(
             row["id"], row["room_id"], row["owner_id"], row["name"],
-            json.loads(row["sheet_json"]), row["version"], row["updated_at"],
+            validate_sheet(json.loads(row["sheet_json"])), row["version"], row["updated_at"],
         )
 
     def list_for(self, room: Room) -> list[Character]:

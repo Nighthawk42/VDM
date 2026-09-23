@@ -42,6 +42,17 @@ def test_campaign_schema_upgrades_without_losing_characters(tmp_path: Path) -> N
         ).fetchone() == ("Old Hero", 1)
 
 
+def test_interrupted_campaign_migration_can_resume(tmp_path: Path) -> None:
+    """A column added before an interrupted startup is not added twice."""
+    storage = SqliteStorage(tmp_path)
+    storage.initialize()
+    with storage.connect(Domain.CAMPAIGNS) as connection:
+        connection.execute("PRAGMA user_version = 1")
+    storage.initialize()
+    with storage.connect(Domain.CAMPAIGNS) as connection:
+        assert connection.execute("PRAGMA user_version").fetchone() == (2,)
+
+
 def test_sheet_and_roll_permissions(tmp_path: Path) -> None:
     """Only 3.5e rooms have sheets; owners and GMs can save and roll."""
     app = create_app(Settings(data_dir=tmp_path, environment="development"))
@@ -74,6 +85,8 @@ def test_sheet_and_roll_permissions(tmp_path: Path) -> None:
         character_id = character["id"]
         assert character["owner_id"] == player_id
         assert character["sheet"]["abilities"]["WIS"] == 10
+        assert character["sheet"]["level"] == 1
+        assert character["sheet"]["class_name"] == ""
         assert character["sheet"]["custom"] == {"portrait": "none"}
         assert len(host.get(f"/api/rooms/{room_id}/characters").json()) == 1
 

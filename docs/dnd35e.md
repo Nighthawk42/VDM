@@ -2,7 +2,7 @@
 
 Character sheets are available only in rooms whose ruleset is `dnd35e`.
 Freeform storytelling does not require or expose sheets. A sheet stores six
-ability scores, a set of named skills with key ability, ranks, and miscellaneous
+ability scores, race, class, level, a set of named skills with key ability, ranks, and miscellaneous
 modifier, notes, and optional additional JSON fields. The extra fields survive
 simple-editor saves. Only the owner or a room GM can edit or roll a character;
 only a GM can attach a DC to a check. The update API requires the current sheet

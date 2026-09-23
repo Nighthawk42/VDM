@@ -117,13 +117,18 @@ class SqliteStorage:
                 connection.execute("PRAGMA journal_mode = WAL")
                 connection.executescript(schema)
                 if domain == Domain.CAMPAIGNS and version < 2:
-                    connection.execute(
-                        "ALTER TABLE characters ADD COLUMN version INTEGER NOT NULL DEFAULT 1"
-                    )
-                    connection.execute(
-                        "ALTER TABLE characters ADD COLUMN updated_at TEXT NOT NULL "
-                        "DEFAULT '1970-01-01 00:00:00'"
-                    )
+                    columns = {
+                        row[1] for row in connection.execute("PRAGMA table_info(characters)")
+                    }
+                    if "version" not in columns:
+                        connection.execute(
+                            "ALTER TABLE characters ADD COLUMN version INTEGER NOT NULL DEFAULT 1"
+                        )
+                    if "updated_at" not in columns:
+                        connection.execute(
+                            "ALTER TABLE characters ADD COLUMN updated_at TEXT NOT NULL "
+                            "DEFAULT '1970-01-01 00:00:00'"
+                        )
                 connection.execute(f"PRAGMA user_version = {SCHEMA_VERSIONS[domain]}")
 
     def is_ready(self) -> bool:

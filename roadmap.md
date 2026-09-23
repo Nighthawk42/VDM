@@ -10,7 +10,9 @@ The local ignored `plan.md` is the living architecture reference. This tracked r
 - [x] Add a runnable service, readiness endpoint, and a simple testing landing page.
 - [x] Refuse to open a database with an unknown newer schema version.
 - [ ] Add versioned migrations before changing database schemas.
-- [ ] Add accounts, Argon2id password hashing, sessions, room roles, and TOTP.
+- [x] Add accounts, Argon2id password hashing, revocable sessions, and the initial host/player room roles.
+- [x] Add stored room messages and live WebSocket delivery.
+- [ ] Add GM role management, platform admin bootstrap, TOTP, and login rate limits.
 
 ## Phase 2: Rules and turns
 
@@ -26,8 +28,8 @@ The local ignored `plan.md` is the living architecture reference. This tracked r
 
 ## Phase 4: Frontend and live play
 
-- [ ] Build the Catppuccin themed React interface.
-- [ ] Connect authentication, rooms, chat, and turns.
+- [x] Build a Catppuccin themed React interface for authentication, rooms, and chat.
+- [ ] Connect the turn queue and GM narration.
 - [ ] Add voice input and the GM dashboard.
 
 ## Operations

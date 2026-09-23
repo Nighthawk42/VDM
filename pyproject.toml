@@ -9,6 +9,7 @@ description = "Virtual Dungeon Master"
 readme = "readme.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "argon2-cffi>=25,<27",
     "fastapi>=0.115,<1",
     "pydantic-settings>=2.6,<3",
     "pyyaml>=6,<7",
@@ -40,6 +41,9 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/vdm/main.py" = ["B008"] # FastAPI dependency declarations use Depends in defaults.
 
 [tool.mypy]
 python_version = "3.12"

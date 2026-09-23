@@ -29,6 +29,7 @@ frontend/dist/
 # Local legacy material and agent handoffs
 backend/
 frontend_old/
+logo.png
 settings.yaml
 vdm.yaml
 prompts.yaml

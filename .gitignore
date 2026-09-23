@@ -1,0 +1,44 @@
+# Local state and secrets
+.env
+.env.*
+!.env.example
+data/
+database/
+/storage/
+*.db
+*.db-shm
+*.db-wal
+
+# Python and uv
+.venv/
+.uv-cache/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.pytest-tmp/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# Frontend outputs
+node_modules/
+frontend/dist/
+
+# Local legacy material and agent handoffs
+backend/
+frontend_old/
+settings.yaml
+vdm.yaml
+prompts.yaml
+plan.md
+progress.md
+agents_chat.md
+passdown.md
+
+# Editor and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

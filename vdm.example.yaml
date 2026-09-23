@@ -1,0 +1,6 @@
+# Copy to vdm.yaml for local defaults. Set secrets with environment variables.
+app_name: Virtual Dungeon Master
+environment: development
+data_dir: data
+host: 127.0.0.1
+port: 8000

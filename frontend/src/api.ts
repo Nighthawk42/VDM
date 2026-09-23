@@ -42,4 +42,5 @@ export const api = {
     request<Event>(`/api/rooms/${encodeURIComponent(id)}/events`, {
       method: 'POST', body: JSON.stringify({ kind, content }),
     }),
+  narrate: (id: string) => request<Event>(`/api/rooms/${encodeURIComponent(id)}/narrate`, { method: 'POST' }),
 }

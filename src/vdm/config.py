@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     data_dir: Path = Path("data")
     host: str = "127.0.0.1"
     port: int = Field(default=8000, ge=1, le=65535)
+    openrouter_model: str = "openai/gpt-6-luna"
+    jev_model: str = "typesafe/jev-1.13"
+    openrouter_api_key: str | None = Field(default=None, exclude=True, repr=False)
+    audio_cpp_url: str = "http://127.0.0.1:8880"
 
     @classmethod
     def settings_customise_sources(
@@ -42,4 +46,6 @@ def load_settings(path: Path | None = None) -> Settings:
         raw = {}
     if not isinstance(raw, dict):
         raise ValueError(f"Settings file must contain a mapping: {config_path}")
+    if "openrouter_api_key" in raw:
+        raise ValueError("OpenRouter API key must be supplied through the environment")
     return Settings(**raw)

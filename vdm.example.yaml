@@ -4,3 +4,6 @@ environment: development
 data_dir: data
 host: 127.0.0.1
 port: 8000
+openrouter_model: openai/gpt-6-luna
+jev_model: typesafe/jev-1.13
+audio_cpp_url: http://127.0.0.1:8880

@@ -143,6 +143,7 @@ function RoomView({ room, user, onBack }: { room: Room; user: User; onBack: () =
   const [draft, setDraft] = useState('')
   const [error, setError] = useState('')
   const [sending, setSending] = useState(false)
+  const [narrating, setNarrating] = useState(false)
   const endRef = useRef<HTMLDivElement>(null)
   const canWrite = room.role !== 'spectator'
   const canNarrate = ['host', 'lead_gm', 'co_gm'].includes(room.role)
@@ -194,12 +195,23 @@ function RoomView({ room, user, onBack }: { room: Room; user: User; onBack: () =
     } catch { setError(`Room code: ${room.id}`) }
   }
 
+  async function askNarrator() {
+    setNarrating(true); setError('')
+    try {
+      const posted = await api.narrate(room.id)
+      setEvents(existing => mergeEvents(existing, [posted]))
+    }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'The narrator is unavailable.') }
+    finally { setNarrating(false) }
+  }
+
   return <main className="table-layout">
     <aside className="table-sidebar">
       <button className="back-link" onClick={onBack}>← All rooms</button>
       <div className="table-identity"><span className="table-emblem">✦</span><span className="section-kicker">ADVENTURE ROOM</span><h1>{room.name}</h1><p>{rulesets.find(item => item.id === room.ruleset_id)?.name ?? room.ruleset_id}</p></div>
       <div className="sidebar-block"><span className="section-kicker">YOUR PLACE AT THE TABLE</span><div className="member-line"><span className="avatar">{user.username[0].toUpperCase()}</span><span><strong>{user.username}</strong><small>{room.role.replace('_', ' ')}</small></span></div></div>
-      <div className="sidebar-block sidebar-tip"><span className="section-kicker">STORY NOTE</span><p>Every action becomes part of this room's chronicle. The narrator tools and AI turns are still in development.</p></div>
+      <div className="sidebar-block sidebar-tip"><span className="section-kicker">STORY NOTE</span><p>Every action becomes part of this room's chronicle. GMs can ask the AI narrator to continue the scene.</p></div>
+      {canNarrate && <button className="button primary share-button" disabled={narrating || events.length === 0} onClick={askNarrator}>{narrating ? 'Narrating…' : '✦ Ask AI to narrate'}</button>}
       <button className="button secondary share-button" onClick={copyLink}>↗ Share room link</button>
     </aside>
     <section className="chronicle">

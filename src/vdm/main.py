@@ -1,10 +1,12 @@
 """ASGI application and startup lifecycle."""
 
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Literal
 
+import httpx
 from fastapi import (
     Depends,
     FastAPI,
@@ -20,7 +22,8 @@ from pydantic import BaseModel, Field, ValidationError
 
 from vdm.auth import SESSION_DAYS, AuthService, User
 from vdm.config import Settings, load_settings
-from vdm.rooms import RULESETS, Event, Room, RoomService
+from vdm.openrouter import NarrationError, narrate
+from vdm.rooms import NARRATORS, RULESETS, Event, Room, RoomService
 from vdm.storage.sqlite import SqliteStorage
 
 INDEX_PATH = Path(__file__).with_name("static") / "index.html"
@@ -56,6 +59,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     auth = AuthService(storage)
     rooms = RoomService(storage)
     connections: dict[str, set[WebSocket]] = {}
+    narration_locks: dict[str, asyncio.Lock] = {}
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
@@ -100,6 +104,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if not storage.is_ready():
             raise HTTPException(status_code=503, detail="Storage is not ready")
         return {"status": "ok", "environment": config.environment}
+
+    @app.get("/api/audio/health")
+    async def audio_health(_user: User = Depends(current_user)) -> dict[str, str]:
+        """Check the configured local audio.cpp service without exposing its address."""
+        try:
+            async with httpx.AsyncClient(timeout=3) as client:
+                response = await client.get(f"{config.audio_cpp_url.rstrip('/')}/health")
+                response.raise_for_status()
+                payload = response.json()
+            if payload.get("status") != "ok":
+                raise ValueError("Audio service is not ready")
+        except (httpx.HTTPError, ValueError, TypeError) as exc:
+            raise HTTPException(status_code=503, detail="Audio service is unavailable") from exc
+        return {"status": "ok", "backend": str(payload.get("backend", "unknown"))}
 
     @app.post("/api/auth/register", status_code=201)
     def register(credentials: Credentials) -> User:
@@ -185,6 +203,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(status_code=403, detail=str(exc)) from exc
         await broadcast(room_id, event)
         return event
+
+    @app.post("/api/rooms/{room_id}/narrate", status_code=201)
+    async def narrate_room(room_id: str, user: User = Depends(current_user)) -> Event:
+        """Let a room GM request one AI continuation, then publish it to the chronicle."""
+        room = member_room(room_id, user)
+        if room.role not in NARRATORS:
+            raise HTTPException(status_code=403, detail="Only a GM can request narration")
+        lock = narration_locks.setdefault(room_id, asyncio.Lock())
+        if lock.locked():
+            raise HTTPException(status_code=409, detail="Narration already in progress")
+        async with lock:
+            try:
+                prose = await narrate(config, room, rooms.history(user, room_id))
+            except NarrationError as exc:
+                raise HTTPException(status_code=503, detail=str(exc)) from exc
+            try:
+                event = rooms.post(room, user, "narration", prose)
+            except PermissionError as exc:
+                raise HTTPException(status_code=403, detail=str(exc)) from exc
+            await broadcast(room_id, event)
+            return event
 
     @app.websocket("/api/rooms/{room_id}/ws")
     async def room_socket(websocket: WebSocket, room_id: str) -> None:

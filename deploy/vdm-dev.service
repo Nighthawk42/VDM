@@ -8,7 +8,7 @@ Type=simple
 WorkingDirectory=/home/nighthawk/apps/vdm-dev
 Environment=VDM_ENVIRONMENT=testing
 Environment=VDM_DATA_DIR=/home/nighthawk/apps/vdm-dev/data
-ExecStart=/home/nighthawk/.local/bin/uv run --locked --no-dev uvicorn vdm.main:app --host 127.0.0.1 --port 18610
+ExecStart=/usr/local/bin/bwsx exec --secret VDM_OPENROUTER_API_KEY=OpenRouter -- /home/nighthawk/.local/bin/uv run --locked --no-dev uvicorn vdm.main:app --host 127.0.0.1 --port 18610
 Restart=on-failure
 RestartSec=3
 

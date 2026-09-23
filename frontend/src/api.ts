@@ -14,12 +14,29 @@ export type Event = {
 export type MessageKind = Exclude<Event['kind'], 'roll'>
 export type Ability = 'STR' | 'DEX' | 'CON' | 'INT' | 'WIS' | 'CHA'
 export type Skill = { ability: Ability; ranks: number; misc: number }
+export type Save = { base: number; misc: number }
+export type Combat = {
+  hp_current: number; hp_max: number; nonlethal: number
+  armor: number; shield: number; natural: number; deflection: number; ac_misc: number
+  initiative_misc: number; base_attack: number; speed: number
+  saves: { fortitude: Save; reflex: Save; will: Save }
+}
+export type SheetEntry = { name: string; bonus: string; damage: string }
+export type EquipmentEntry = { name: string; quantity: string; notes: string }
+export type SpellEntry = { name: string; level: string; notes: string }
 export type CharacterSheet = {
   race: string
   class_name: string
+  alignment: string
   level: number
+  experience: number
   abilities: Record<Ability, number>
   skills: Record<string, Skill>
+  combat: Combat
+  attacks: SheetEntry[]
+  equipment: EquipmentEntry[]
+  spells: SpellEntry[]
+  feats: string[]
   notes: string
   [key: string]: unknown
 }

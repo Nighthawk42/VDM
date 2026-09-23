@@ -12,6 +12,7 @@ from vdm.storage.sqlite import Domain, SqliteStorage
 
 ABILITIES = ("STR", "DEX", "CON", "INT", "WIS", "CHA")
 MAX_SHEET_BYTES = 32_768
+SAVE_ABILITIES = {"fortitude": "CON", "reflex": "DEX", "will": "WIS"}
 
 
 class CharacterConflict(Exception):
@@ -34,7 +35,7 @@ class Character:
 def validate_sheet(raw: dict[str, Any]) -> dict[str, Any]:
     """Validate core 3.5e fields while preserving additional JSON fields."""
     sheet = dict(raw)
-    for key in ("race", "class_name"):
+    for key in ("race", "class_name", "alignment"):
         value = sheet.get(key, "")
         if not isinstance(value, str) or len(value) > 80:
             raise ValueError(f"{key} must be text of at most 80 characters")
@@ -43,6 +44,14 @@ def validate_sheet(raw: dict[str, Any]) -> dict[str, Any]:
     if isinstance(level, bool) or not isinstance(level, int) or not 1 <= level <= 99:
         raise ValueError("Level must be a whole number from 1 to 99")
     sheet["level"] = level
+    experience = sheet.get("experience", 0)
+    if (
+        isinstance(experience, bool)
+        or not isinstance(experience, int)
+        or not 0 <= experience <= 10_000_000
+    ):
+        raise ValueError("Experience must be a whole number from 0 to 10000000")
+    sheet["experience"] = experience
     abilities = sheet.get("abilities", {})
     if not isinstance(abilities, dict) or any(key not in ABILITIES for key in abilities):
         raise ValueError("Abilities must use STR, DEX, CON, INT, WIS, and CHA")
@@ -74,6 +83,60 @@ def validate_sheet(raw: dict[str, Any]) -> dict[str, Any]:
         if isinstance(misc, bool) or not isinstance(misc, int) or not -100 <= misc <= 100:
             raise ValueError(f"{name}: misc must be a whole number from -100 to 100")
     sheet["skills"] = skills
+    combat = sheet.get("combat", {})
+    if not isinstance(combat, dict):
+        raise ValueError("Combat must be an object")
+    combat_defaults = {
+        "hp_current": 0, "hp_max": 0, "nonlethal": 0, "armor": 0, "shield": 0,
+        "natural": 0, "deflection": 0, "ac_misc": 0, "initiative_misc": 0,
+        "base_attack": 0, "speed": 30,
+    }
+    if set(combat) - (set(combat_defaults) | {"saves"}):
+        raise ValueError("Unknown combat field")
+    for key, default in combat_defaults.items():
+        value = combat.get(key, default)
+        if isinstance(value, bool) or not isinstance(value, int) or not -100 <= value <= 1000:
+            raise ValueError(f"{key} must be a whole number from -100 to 1000")
+        combat[key] = value
+    saves = combat.get("saves", {})
+    if not isinstance(saves, dict) or set(saves) - set(SAVE_ABILITIES):
+        raise ValueError("Saves must contain fortitude, reflex, and will")
+    for name in SAVE_ABILITIES:
+        entry = saves.get(name, {"base": 0, "misc": 0})
+        if not isinstance(entry, dict) or set(entry) != {"base", "misc"}:
+            raise ValueError(f"{name} must contain base and misc")
+        for key, value in entry.items():
+            if isinstance(value, bool) or not isinstance(value, int) or not -100 <= value <= 100:
+                raise ValueError(f"{name} {key} must be a whole number from -100 to 100")
+        saves[name] = entry
+    combat["saves"] = saves
+    sheet["combat"] = combat
+
+    for key, fields in {
+        "attacks": ("name", "bonus", "damage"),
+        "equipment": ("name", "quantity", "notes"),
+        "spells": ("name", "level", "notes"),
+    }.items():
+        entries = sheet.get(key, [])
+        if not isinstance(entries, list) or len(entries) > 100:
+            raise ValueError(f"{key} must be a list of at most 100 entries")
+        for entry in entries:
+            if not isinstance(entry, dict) or set(entry) != set(fields):
+                raise ValueError(f"{key} entries must contain {', '.join(fields)}")
+            if any(
+                not isinstance(entry[field], str) or len(entry[field]) > 160
+                for field in fields
+            ):
+                raise ValueError(f"{key} entry fields must be text of at most 160 characters")
+        sheet[key] = entries
+    feats = sheet.get("feats", [])
+    if (
+        not isinstance(feats, list)
+        or len(feats) > 100
+        or any(not isinstance(item, str) or len(item) > 160 for item in feats)
+    ):
+        raise ValueError("Feats must be a list of at most 100 short text entries")
+    sheet["feats"] = feats
     notes = sheet.get("notes", "")
     if not isinstance(notes, str) or len(notes) > 4000:
         raise ValueError("Notes must be text of at most 4000 characters")

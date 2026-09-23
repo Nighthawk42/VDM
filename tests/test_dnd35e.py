@@ -74,6 +74,8 @@ def test_sheet_and_roll_permissions(tmp_path: Path) -> None:
         sheet = {
             "abilities": {"STR": 9, "DEX": 16},
             "skills": {"Hide": {"ability": "DEX", "ranks": 2.5, "misc": 1}},
+            "combat": {"hp_current": 8, "hp_max": 12},
+            "equipment": [{"name": "Rope", "quantity": "1", "notes": "50 ft."}],
             "notes": "A quiet scout",
             "custom": {"portrait": "none"},
         }
@@ -88,6 +90,8 @@ def test_sheet_and_roll_permissions(tmp_path: Path) -> None:
         assert character["sheet"]["level"] == 1
         assert character["sheet"]["class_name"] == ""
         assert character["sheet"]["custom"] == {"portrait": "none"}
+        assert character["sheet"]["combat"]["hp_current"] == 8
+        assert character["sheet"]["equipment"][0]["name"] == "Rope"
         assert len(host.get(f"/api/rooms/{room_id}/characters").json()) == 1
 
         assert host.post(
@@ -148,3 +152,25 @@ def test_sheet_validation_and_check_edge_cases() -> None:
     high = resolve_check(character, "ability", "STR", 0, lambda: 1)
     assert high.total == 0
     assert high.success is True
+
+
+def test_expanded_sheet_defaults_and_entries_survive_validation() -> None:
+    """Older sheets load and the new combat and inventory fields persist."""
+    old = validate_sheet({"race": "Elf", "skills": {}})
+    assert old["combat"]["speed"] == 30
+    assert old["combat"]["saves"]["fortitude"] == {"base": 0, "misc": 0}
+    assert old["attacks"] == old["equipment"] == old["spells"] == old["feats"] == []
+
+    expanded = validate_sheet({
+        "alignment": "Neutral Good", "experience": 1200,
+        "combat": {"hp_current": 8, "hp_max": 12, "armor": 4,
+                   "saves": {"reflex": {"base": 3, "misc": 1}}},
+        "attacks": [{"name": "Longsword", "bonus": "+4", "damage": "1d8+2"}],
+        "equipment": [{"name": "Rope", "quantity": "1", "notes": "50 ft."}],
+        "feats": ["Weapon Focus"],
+        "spells": [{"name": "Light", "level": "0", "notes": "At will"}],
+    })
+    assert expanded["combat"]["hp_current"] == 8
+    assert expanded["combat"]["saves"]["reflex"]["base"] == 3
+    assert expanded["attacks"][0]["damage"] == "1d8+2"
+    assert expanded["spells"][0]["name"] == "Light"

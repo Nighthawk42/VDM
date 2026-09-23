@@ -1,15 +1,12 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { api, type Ability, type Character, type CharacterSheet, type Event, type Room, type User } from './api'
+import { api, type Character, type CharacterSheet, type Event, type Room, type User } from './api'
+import { Dnd35SheetTabs } from './Dnd35SheetTabs'
 
-const abilities: Ability[] = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA']
-const extraKeys = new Set(['race', 'class_name', 'level', 'abilities', 'skills', 'notes'])
+const extraKeys = new Set(['race', 'class_name', 'alignment', 'level', 'experience', 'abilities', 'skills', 'combat', 'attacks', 'equipment', 'feats', 'spells', 'notes'])
 
 function extrasFor(sheet: CharacterSheet): string {
   return JSON.stringify(Object.fromEntries(Object.entries(sheet).filter(([key]) => !extraKeys.has(key))), null, 2)
 }
-
-function signed(value: number): string { return value >= 0 ? `+${value}` : `${value}` }
-function modifier(score: number): number { return Math.floor((score - 10) / 2) }
 
 export function CharacterWorkspace({ room, user, onRoll }: {
   room: Room; user: User; onRoll: (event: Event) => void
@@ -18,7 +15,6 @@ export function CharacterWorkspace({ room, user, onRoll }: {
   const [draft, setDraft] = useState<Character | null>(null)
   const [extras, setExtras] = useState('{}')
   const [newName, setNewName] = useState('')
-  const [newSkill, setNewSkill] = useState('')
   const [dc, setDc] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -69,7 +65,7 @@ export function CharacterWorkspace({ room, user, onRoll }: {
     try {
       const parsed: unknown = JSON.parse(extras)
       if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Extra data must be a JSON object.')
-      if (Object.keys(parsed).some(key => extraKeys.has(key))) throw new Error('Edit abilities, skills, and notes in their fields above.')
+      if (Object.keys(parsed).some(key => extraKeys.has(key))) throw new Error('Edit sheet fields in their sections above.')
       const sheet = { ...draft.sheet, ...parsed as Record<string, unknown> }
       Object.keys(sheet).forEach(key => { if (!extraKeys.has(key) && !(key in parsed)) delete sheet[key] })
       const saved = await api.updateCharacter(room.id, { ...draft, sheet })
@@ -77,17 +73,6 @@ export function CharacterWorkspace({ room, user, onRoll }: {
       setDraft(saved); setExtras(extrasFor(saved.sheet)); setMessage('Character saved.')
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not save character.') }
     finally { setBusy(false) }
-  }
-
-  function addSkill(event: FormEvent) {
-    event.preventDefault()
-    const name = newSkill.trim()
-    if (!name || !draft) return
-    if (Object.keys(draft.sheet.skills).some(existing => existing.toLowerCase() === name.toLowerCase())) {
-      setError('That skill is already on the sheet.'); return
-    }
-    changeSheet({ skills: { ...draft.sheet.skills, [name]: { ability: 'WIS', ranks: 0, misc: 0 } } })
-    setNewSkill(''); setError('')
   }
 
   async function roll(kind: 'ability' | 'skill', target: string) {
@@ -119,24 +104,8 @@ export function CharacterWorkspace({ room, user, onRoll }: {
       {draft ? <div className="character-editor">
         <div className="character-editor-head"><div><span className="section-kicker">CHARACTER</span><h4>{draft.name}</h4></div><span className="muted">{canEdit ? 'Editable' : 'View only'}</span></div>
         <label className="character-name">Name<input maxLength={80} value={draft.name} disabled={!canEdit} onChange={event => setDraft({ ...draft, name: event.target.value })} /></label>
-        <div className="character-basics"><label>Race<input maxLength={80} value={draft.sheet.race} disabled={!canEdit} onChange={event => changeSheet({ race: event.target.value })} placeholder="e.g. Elf" /></label><label>Class<input maxLength={80} value={draft.sheet.class_name} disabled={!canEdit} onChange={event => changeSheet({ class_name: event.target.value })} placeholder="e.g. Rogue" /></label><label>Level<input type="number" min={1} max={99} value={draft.sheet.level} disabled={!canEdit} onChange={event => changeSheet({ level: Number(event.target.value) })} /></label></div>
         {isGM && <label className="character-dc">Check DC (optional)<input type="number" min={0} max={100} value={dc} onChange={event => setDc(event.target.value)} placeholder="Set by GM" /></label>}
-        <div className="character-section"><h5>Ability scores</h5><div className="ability-grid">{abilities.map(ability => <div className="ability-card" key={ability}>
-          <label>{ability}<input type="number" min={1} max={99} value={draft.sheet.abilities[ability]} disabled={!canEdit} onChange={event => changeSheet({ abilities: { ...draft.sheet.abilities, [ability]: Number(event.target.value) } })} /></label>
-          <span>{signed(modifier(draft.sheet.abilities[ability]))}</span>
-          <button className="text-button" disabled={!canEdit || busy || dirty} onClick={() => roll('ability', ability)}>Roll</button>
-        </div>)}</div></div>
-        <div className="character-section"><h5>Skills</h5><p className="field-help">Ranks may use half steps. Add equipment, circumstance, or other bonuses under Misc.</p>
-          <div className="skill-list">{Object.entries(draft.sheet.skills).map(([name, skill]) => <div className="skill-row" key={name}>
-            <strong title={name}>{name}</strong><label>Ability<select value={skill.ability} disabled={!canEdit} onChange={event => changeSheet({ skills: { ...draft.sheet.skills, [name]: { ...skill, ability: event.target.value as Ability } } })}>{abilities.map(value => <option key={value}>{value}</option>)}</select></label>
-            <label>Ranks<input type="number" min={0} max={100} step={0.5} value={skill.ranks} disabled={!canEdit} onChange={event => changeSheet({ skills: { ...draft.sheet.skills, [name]: { ...skill, ranks: Number(event.target.value) } } })} /></label>
-            <label>Misc<input type="number" min={-100} max={100} value={skill.misc} disabled={!canEdit} onChange={event => changeSheet({ skills: { ...draft.sheet.skills, [name]: { ...skill, misc: Number(event.target.value) } } })} /></label>
-            <button className="button secondary" disabled={!canEdit || busy || dirty} onClick={() => roll('skill', name)}>Roll</button>
-            {canEdit && <button className="skill-remove" aria-label={`Remove ${name}`} onClick={() => { const skills = { ...draft.sheet.skills }; delete skills[name]; changeSheet({ skills }) }}>×</button>}
-          </div>)}</div>
-          {canEdit && <form className="skill-add" onSubmit={addSkill}><label className="sr-only" htmlFor="new-skill">Skill name</label><input id="new-skill" maxLength={60} value={newSkill} onChange={event => setNewSkill(event.target.value)} placeholder="Add a skill, e.g. Hide" /><button className="button secondary" disabled={!newSkill.trim()}>Add skill</button></form>}
-        </div>
-        <div className="character-section"><label className="character-notes">Notes<textarea rows={4} maxLength={4000} value={draft.sheet.notes} disabled={!canEdit} onChange={event => changeSheet({ notes: event.target.value })} /></label></div>
+        <Dnd35SheetTabs sheet={draft.sheet} canEdit={canEdit} busy={busy} dirty={dirty} change={changeSheet} roll={roll} />
         {canEdit && <details className="character-section extra-fields"><summary>Additional JSON fields</summary><p className="field-help">Optional data beyond the simple fields. This must be a JSON object.</p><textarea rows={6} value={extras} onChange={event => setExtras(event.target.value)} spellCheck={false} /></details>}
         {canEdit && <div className="character-save"><span>{dirty ? 'Save changes before rolling.' : 'Sheet is up to date.'}</span><button className="button primary" onClick={save} disabled={busy || !dirty}>{busy ? 'Working…' : 'Save character'}</button></div>}
       </div> : <div className="character-empty"><span className="ornament">✧</span><h4>Gather the party.</h4><p>Create a character to start keeping track of abilities and skills.</p></div>}

@@ -81,6 +81,8 @@ SCHEMAS: dict[Domain, str] = {
     """,
 }
 
+SCHEMA_VERSIONS = {domain: (2 if domain == Domain.CAMPAIGNS else 1) for domain in Domain}
+
 
 class SqliteStorage:
     """Own the four domain files and their connection settings."""
@@ -110,11 +112,19 @@ class SqliteStorage:
         for domain, schema in SCHEMAS.items():
             with self.connect(domain) as connection:
                 version = connection.execute("PRAGMA user_version").fetchone()[0]
-                if version > 1:
+                if version > SCHEMA_VERSIONS[domain]:
                     raise RuntimeError(f"Unsupported {domain.value} schema version: {version}")
                 connection.execute("PRAGMA journal_mode = WAL")
                 connection.executescript(schema)
-                connection.execute("PRAGMA user_version = 1")
+                if domain == Domain.CAMPAIGNS and version < 2:
+                    connection.execute(
+                        "ALTER TABLE characters ADD COLUMN version INTEGER NOT NULL DEFAULT 1"
+                    )
+                    connection.execute(
+                        "ALTER TABLE characters ADD COLUMN updated_at TEXT NOT NULL "
+                        "DEFAULT '1970-01-01 00:00:00'"
+                    )
+                connection.execute(f"PRAGMA user_version = {SCHEMA_VERSIONS[domain]}")
 
     def is_ready(self) -> bool:
         """Check that every domain can be read."""
@@ -122,6 +132,7 @@ class SqliteStorage:
             if not self.path_for(domain).is_file():
                 return False
             with self.connect(domain) as connection:
-                if connection.execute("PRAGMA user_version").fetchone()[0] != 1:
+                version = connection.execute("PRAGMA user_version").fetchone()[0]
+                if version != SCHEMA_VERSIONS[domain]:
                     return False
         return True

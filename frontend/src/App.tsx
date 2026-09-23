@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { api, type Event, type Room, type User } from './api'
+import { api, type Event, type MessageKind, type Room, type User } from './api'
+import { CharacterWorkspace } from './CharacterWorkspace'
 
 const flavors = ['mocha', 'macchiato', 'frappe', 'latte'] as const
 type Flavor = typeof flavors[number]
@@ -139,7 +140,8 @@ function Lobby({ user, onEnter }: { user: User; onEnter: (room: Room) => void })
 function RoomView({ room, user, onBack }: { room: Room; user: User; onBack: () => void }) {
   const [events, setEvents] = useState<Event[]>([])
   const [connected, setConnected] = useState(false)
-  const [kind, setKind] = useState<Event['kind']>('action')
+  const [kind, setKind] = useState<MessageKind>('action')
+  const [view, setView] = useState<'story' | 'characters'>('story')
   const [draft, setDraft] = useState('')
   const [error, setError] = useState('')
   const [sending, setSending] = useState(false)
@@ -215,22 +217,24 @@ function RoomView({ room, user, onBack }: { room: Room; user: User; onBack: () =
       <button className="button secondary share-button" onClick={copyLink}>↗ Share room link</button>
     </aside>
     <section className="chronicle">
-      <header className="chronicle-header"><div><span className="section-kicker">THE CHRONICLE</span><h2>{room.name}</h2></div><span className={`connection ${connected ? 'online' : ''}`}><span className="connection-dot" />{connected ? 'Live' : 'Reconnecting'}</span></header>
-      <div className="chronicle-scroll">
+      <header className="chronicle-header"><div><span className="section-kicker">{view === 'story' ? 'THE CHRONICLE' : 'THE PARTY'}</span><h2>{room.name}</h2></div><span className={`connection ${connected ? 'online' : ''}`}><span className="connection-dot" />{connected ? 'Live' : 'Reconnecting'}</span></header>
+      {room.ruleset_id === 'dnd35e' && <nav className="room-tabs" aria-label="Room sections"><button className={view === 'story' ? 'active' : ''} onClick={() => setView('story')}>Story</button><button className={view === 'characters' ? 'active' : ''} onClick={() => setView('characters')}>Characters & checks</button></nav>}
+      {view === 'characters' && room.ruleset_id === 'dnd35e' ? <CharacterWorkspace room={room} user={user} onRoll={posted => { setEvents(existing => mergeEvents(existing, [posted])); setView('story') }} /> : <><div className="chronicle-scroll">
         {events.length ? <div className="event-list">{events.map(entry => <article key={entry.id} className={`story-entry ${entry.kind}`}>
-          <div className="entry-meta"><span className="entry-avatar">{entry.kind === 'narration' ? '✦' : entry.actor_name[0].toUpperCase()}</span><strong>{entry.kind === 'narration' ? `${entry.actor_name} · Narrator` : entry.actor_name}</strong><span className="entry-kind">{entry.kind === 'ooc' ? 'Out of character' : entry.kind === 'action' ? 'Action' : 'Narration'}</span></div>
+          <div className="entry-meta"><span className="entry-avatar">{entry.kind === 'narration' ? '✦' : entry.kind === 'roll' ? '🎲' : entry.actor_name[0].toUpperCase()}</span><strong>{entry.kind === 'narration' ? `${entry.actor_name} · Narrator` : entry.actor_name}</strong><span className="entry-kind">{entry.kind === 'ooc' ? 'Out of character' : entry.kind === 'action' ? 'Action' : entry.kind === 'roll' ? '3.5e check' : 'Narration'}</span></div>
           <p>{entry.content}</p>
+          {entry.kind === 'roll' && entry.details && <small className="roll-breakdown">Ability {String(entry.details.ability)} {Number(entry.details.ability_modifier) >= 0 ? '+' : ''}{String(entry.details.ability_modifier)} · Ranks {String(entry.details.ranks)} · Misc {Number(entry.details.misc) >= 0 ? '+' : ''}{String(entry.details.misc)}</small>}
         </article>)}</div> : <div className="empty-story"><div className="ornament">✦</div><span className="section-kicker">A BLANK PAGE</span><h3>The story starts with you.</h3><p>Set the scene, speak in character, or tell your party what you do next.</p></div>}
         <div ref={endRef} />
       </div>
       <div className="composer-wrap">
         {error && <div className={`notice ${error.includes('copied') ? 'success' : 'error'}`} role="status">{error}</div>}
         {canWrite ? <form className="composer" onSubmit={send}>
-          <div className="composer-top"><label className="sr-only" htmlFor="kind">Message type</label><select id="kind" value={kind} onChange={event => setKind(event.target.value as Event['kind'])}><option value="action">Player action</option><option value="ooc">Out of character</option>{canNarrate && <option value="narration">GM narration</option>}</select><span>What happens next?</span></div>
+          <div className="composer-top"><label className="sr-only" htmlFor="kind">Message type</label><select id="kind" value={kind} onChange={event => setKind(event.target.value as MessageKind)}><option value="action">Player action</option><option value="ooc">Out of character</option>{canNarrate && <option value="narration">GM narration</option>}</select><span>What happens next?</span></div>
           <textarea value={draft} onChange={event => setDraft(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit() } }} placeholder={kind === 'narration' ? 'The old door creaks open…' : 'I step into the room and look around…'} maxLength={4000} rows={3} />
           <div className="composer-bottom"><span>Enter to send · Shift + Enter for a new line</span><button className="button primary" disabled={sending || !draft.trim()}>{sending ? 'Sending…' : 'Send'} <span aria-hidden="true">↗</span></button></div>
         </form> : <div className="spectator-note">You are watching this story as a spectator.</div>}
-      </div>
+      </div></>}
     </section>
   </main>
 }

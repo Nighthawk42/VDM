@@ -4,7 +4,7 @@ VDM is being rebuilt as a multiplayer storytelling and tabletop platform. The `d
 
 ## Current build
 
-The development build has a FastAPI service, four isolated SQLite databases, registration and revocable browser sessions, room creation and joining, role-gated live messages, and a React story interface. AI narration, turn arbitration, voice, and the structured rulesets are still under development. See [roadmap.md](roadmap.md) for the next milestones.
+The development build has a FastAPI service, four isolated SQLite databases, registration and revocable browser sessions, room creation and joining, role-gated live messages, a React story interface, and GM-requested AI narration. D&D 3.5e rooms have an initial JSON-backed character sheet editor and server-resolved ability and skill checks. Freeform storytelling rooms do not require sheets. Turn arbitration, voice, and the remaining ruleset mechanics are still under development. See [roadmap.md](roadmap.md) for the next milestones.
 
 ## Run locally
 

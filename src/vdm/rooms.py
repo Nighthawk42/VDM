@@ -6,6 +6,7 @@ import sqlite3
 import uuid
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Any
 
 from vdm.auth import User
 from vdm.storage.sqlite import Domain, SqliteStorage
@@ -47,6 +48,7 @@ class Event:
     kind: str
     content: str
     created_at: str
+    details: dict[str, Any] | None = None
 
 
 class RoomService:
@@ -128,8 +130,26 @@ class RoomService:
             allowed = current_room.role in WRITERS and kind in {"action", "ooc"}
         if not allowed:
             raise PermissionError("Role cannot post this message")
+        return self._store_event(room, user, kind, content)
+
+    def record_check(
+        self, room: Room, user: User, content: str, details: dict[str, Any]
+    ) -> Event:
+        """Record a server-resolved check in the room chronicle."""
+        current_room = self.get(user, room.id)
+        if current_room is None or current_room.role not in WRITERS:
+            raise PermissionError("Role cannot roll in this room")
+        return self._store_event(room, user, "roll", content, details)
+
+    def _store_event(
+        self, room: Room, user: User, kind: str, content: str,
+        details: dict[str, Any] | None = None,
+    ) -> Event:
+        """Persist a validated room event; callers enforce event-specific permissions."""
         event_id = uuid.uuid4().hex
-        payload = json.dumps({"content": content, "actor_name": user.username})
+        payload = json.dumps({
+            "content": content, "actor_name": user.username, "details": details,
+        })
         with self.storage.connect(Domain.CHRONICLES) as connection:
             connection.row_factory = sqlite3.Row
             connection.execute(
@@ -140,7 +160,9 @@ class RoomService:
             row = connection.execute(
                 "SELECT created_at FROM events WHERE id = ?", (event_id,)
             ).fetchone()
-        return Event(event_id, room.id, user.id, user.username, kind, content, row["created_at"])
+        return Event(
+            event_id, room.id, user.id, user.username, kind, content, row["created_at"], details
+        )
 
     def history(self, user: User, room_id: str, limit: int = 100) -> list[Event]:
         """Return recent events only to a current room member."""
@@ -153,15 +175,11 @@ class RoomService:
                    FROM events WHERE room_id = ? ORDER BY rowid DESC LIMIT ?""",
                 (room_id, limit),
             ).fetchall()
-        return [
-            Event(
-                row["id"],
-                row["room_id"],
-                row["actor_id"],
-                json.loads(row["payload_json"])["actor_name"],
-                row["kind"],
-                json.loads(row["payload_json"])["content"],
-                row["created_at"],
-            )
-            for row in reversed(rows)
-        ]
+        events = []
+        for row in reversed(rows):
+            payload = json.loads(row["payload_json"])
+            events.append(Event(
+                row["id"], row["room_id"], row["actor_id"], payload["actor_name"],
+                row["kind"], payload["content"], row["created_at"], payload.get("details"),
+            ))
+        return events

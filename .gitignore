@@ -3,6 +3,7 @@
 .env.*
 !.env.example
 data/
+.qa-data/
 database/
 /storage/
 *.db

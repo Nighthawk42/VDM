@@ -6,9 +6,28 @@ export type Event = {
   room_id: string
   actor_id: string
   actor_name: string
-  kind: 'action' | 'ooc' | 'narration'
+  kind: 'action' | 'ooc' | 'narration' | 'roll'
   content: string
   created_at: string
+  details?: Record<string, unknown> | null
+}
+export type MessageKind = Exclude<Event['kind'], 'roll'>
+export type Ability = 'STR' | 'DEX' | 'CON' | 'INT' | 'WIS' | 'CHA'
+export type Skill = { ability: Ability; ranks: number; misc: number }
+export type CharacterSheet = {
+  abilities: Record<Ability, number>
+  skills: Record<string, Skill>
+  notes: string
+  [key: string]: unknown
+}
+export type Character = {
+  id: string
+  room_id: string
+  owner_id: string
+  name: string
+  sheet: CharacterSheet
+  version: number
+  updated_at: string
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -38,9 +57,22 @@ export const api = {
     request<Room>('/api/rooms', { method: 'POST', body: JSON.stringify({ name, ruleset_id }) }),
   joinRoom: (id: string) => request<Room>(`/api/rooms/${encodeURIComponent(id)}/join`, { method: 'POST' }),
   events: (id: string) => request<Event[]>(`/api/rooms/${encodeURIComponent(id)}/events`),
-  post: (id: string, kind: Event['kind'], content: string) =>
+  post: (id: string, kind: MessageKind, content: string) =>
     request<Event>(`/api/rooms/${encodeURIComponent(id)}/events`, {
       method: 'POST', body: JSON.stringify({ kind, content }),
     }),
   narrate: (id: string) => request<Event>(`/api/rooms/${encodeURIComponent(id)}/narrate`, { method: 'POST' }),
+  characters: (roomId: string) => request<Character[]>(`/api/rooms/${encodeURIComponent(roomId)}/characters`),
+  createCharacter: (roomId: string, name: string) => request<Character>(
+    `/api/rooms/${encodeURIComponent(roomId)}/characters`,
+    { method: 'POST', body: JSON.stringify({ name, sheet: {} }) },
+  ),
+  updateCharacter: (roomId: string, character: Character) => request<Character>(
+    `/api/rooms/${encodeURIComponent(roomId)}/characters/${encodeURIComponent(character.id)}`,
+    { method: 'PUT', body: JSON.stringify({ name: character.name, sheet: character.sheet, version: character.version }) },
+  ),
+  rollCheck: (roomId: string, characterId: string, kind: 'ability' | 'skill', target: string, dc?: number) =>
+    request<Event>(`/api/rooms/${encodeURIComponent(roomId)}/characters/${encodeURIComponent(characterId)}/checks`, {
+      method: 'POST', body: JSON.stringify({ kind, target, dc }),
+    }),
 }

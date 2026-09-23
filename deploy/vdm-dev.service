@@ -1,0 +1,16 @@
+[Unit]
+Description=VDM dev testing service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/nighthawk/apps/vdm-dev
+Environment=VDM_ENVIRONMENT=testing
+Environment=VDM_DATA_DIR=/home/nighthawk/apps/vdm-dev/data
+ExecStart=/home/nighthawk/.local/bin/uv run --locked --no-dev uvicorn vdm.main:app --host 127.0.0.1 --port 18610
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target
